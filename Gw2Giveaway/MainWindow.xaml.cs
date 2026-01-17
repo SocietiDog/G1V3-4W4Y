@@ -1,10 +1,13 @@
-﻿using Newtonsoft.Json;
+﻿using System;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Net.Http;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using Newtonsoft.Json;
 
 namespace Gw2Giveaway
 {
@@ -13,73 +16,120 @@ namespace Gw2Giveaway
         public ObservableCollection<string> Entrants { get; } = new();
         private TwitchChat? _twitch;
         private OverlayWindow? _overlay;
-
-        public PrizeBank Bank { get; private set; } = new PrizeBank();
-        //private BankWindow? _bankWindow;
-
+        private BankWindow? _bankWindow;
+        public PrizeBank Bank { get; private set; } = new();
         private readonly HttpClient _httpClient = new HttpClient();
-
-        // Save next to the exe in a "Data" subfolder (same as item cache)
-        private static readonly string AppDir = AppDomain.CurrentDomain.BaseDirectory;
-        private static readonly string DataFolder = Path.Combine(AppDir, "Data");
-       
+        private static readonly string DataFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data");
         private static readonly string BankFile = Path.Combine(DataFolder, "prizebank.json");
-       
+        private static readonly string SettingsFile = Path.Combine(DataFolder, "settings.json");
+        private AppSettings _settings = new();
+
         public MainWindow()
         {
             InitializeComponent();
             EntrantsList.ItemsSource = Entrants;
-
-            // Load database with progress on startup
+            LoadSettings();
             LoadDatabaseWithProgress();
+        }
 
+        private void LoadSettings()
+        {
+            if (File.Exists(SettingsFile))
+            {
+                try
+                {
+                    string json = File.ReadAllText(SettingsFile);
+                    _settings = JsonConvert.DeserializeObject<AppSettings>(json) ?? new AppSettings();
+                }
+                catch { /* corrupted – use defaults */ }
+            }
+
+            ChannelText.Text = _settings.TwitchChannel;
+            BotNameText.Text = _settings.TwitchBotName;
+            OAuthBox.Password = _settings.TwitchOAuth;
+            EntryModeCombo.SelectedIndex = (int)_settings.EntryType;
+            EntryCommandText.Text = _settings.EntryCommand;
+            ChatTemplateText.Text = _settings.ChatTemplate;
+            WinnerPrizeTemplateText.Text = _settings.WinnerPrizeTemplate;
+            RollModeCombo.SelectedIndex = (int)_settings.CurrentRollMode;
+            ShowRarityBadgesCheck.IsChecked = _settings.ShowPrizeRarityBadges;
+            ClassicPrizeNameText.Text = _settings.ClassicPrizeName;
+            ClassicPrizeInputText.Text = _settings.ClassicPrizeIconUrl;
+            LoadClassicPreview(_settings.ClassicPrizeIconUrl);
+        }
+
+        private void SaveSettings()
+        {
+            _settings.TwitchChannel = ChannelText.Text;
+            _settings.TwitchBotName = BotNameText.Text;
+            _settings.TwitchOAuth = OAuthBox.Password;
+            _settings.EntryType = (EntryMode)EntryModeCombo.SelectedIndex;
+            _settings.EntryCommand = EntryCommandText.Text;
+            _settings.ChatTemplate = ChatTemplateText.Text;
+            _settings.WinnerPrizeTemplate = WinnerPrizeTemplateText.Text;
+            _settings.CurrentRollMode = (RollMode)RollModeCombo.SelectedIndex;
+            _settings.ShowPrizeRarityBadges = ShowRarityBadgesCheck.IsChecked == true;
+            _settings.ClassicPrizeName = ClassicPrizeNameText.Text;
+            _settings.ClassicPrizeIconUrl = ClassicPrizeInputText.Text;
+
+            try
+            {
+                string json = JsonConvert.SerializeObject(_settings, Formatting.Indented);
+                Directory.CreateDirectory(DataFolder);
+                File.WriteAllText(SettingsFile, json);
+            }
+            catch { /* ignore */ }
         }
 
         private async Task LoadDatabaseWithProgress(bool forceRefresh = false)
         {
-            DatabaseStatus.Text = forceRefresh ? "Refreshing database..." : "Loading database...";
-            DatabaseProgress.Value = 0;
+            await Dispatcher.InvokeAsync(() =>
+            {
+                DatabaseStatus.Text = forceRefresh ? "Refreshing database..." : "Loading database...";
+                DatabaseProgress.Value = 0;
+            });
 
             var progress = new Progress<int>(p =>
             {
-                DatabaseProgress.Value = p;
-                DatabaseStatus.Text = $"Loading: {p}%";
+                Dispatcher.Invoke(() =>
+                {
+                    DatabaseProgress.Value = p;
+                    if (p < 100)
+                        DatabaseStatus.Text = $"Loading: {p}%";
+                });
             });
 
             try
             {
-                if (forceRefresh)
-                {
-                    string cacheFile = Path.Combine(DataFolder, "items.json");
-                    if (File.Exists(cacheFile)) File.Delete(cacheFile);
-                }
-
                 await Gw2ItemDatabase.LoadAsync(_httpClient, progress);
 
-                DatabaseStatus.Text = $"Ready ({Gw2ItemDatabase.Items.Count:N0} items)";
-                DatabaseProgress.Value = 100;
-
-                //LoadBankFromFile();
-                Bank.Hydrate();
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    DatabaseProgress.Value = 100;
+                    DatabaseStatus.Text = $"Ready ({Gw2ItemDatabase.Items.Count:N0} items)";
+                });
             }
             catch (Exception ex)
             {
-                DatabaseStatus.Text = "Load failed";
-                MessageBox.Show("Database error: " + ex.Message + "\nCheck internet.");
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    DatabaseProgress.Value = 0;
+                    DatabaseStatus.Text = "Load failed";
+                    MessageBox.Show("Database error: " + ex.Message + "\nCheck internet connection.");
+                });
             }
         }
 
-       
-        // Refresh button – async void is fine for event handlers
         private async void RefreshDatabase_Click(object sender, RoutedEventArgs e)
         {
             await LoadDatabaseWithProgress(true);
         }
+
         private void LoadBankFromFile()
         {
             if (!File.Exists(BankFile))
             {
-                Bank = new PrizeBank(); // constructor initializes the grid
+                Bank = new PrizeBank();
                 SaveBank();
                 return;
             }
@@ -91,14 +141,25 @@ namespace Gw2Giveaway
                 if (loaded != null)
                 {
                     Bank = loaded;
+
+                    if (Bank.Slots == null || Bank.Slots.GetLength(0) != 3 || Bank.Slots.GetLength(1) != 10)
+                    {
+                        Bank = new PrizeBank();
+                    }
+                }
+                else
+                {
+                    Bank = new PrizeBank();
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Failed to load prize bank (possibly old format). Starting with a fresh bank.\n" + ex.Message);
+                MessageBox.Show("Failed to load prize bank – starting with fresh empty bank.\n" + ex.Message);
                 Bank = new PrizeBank();
-                SaveBank();
             }
+
+            Bank.Hydrate();
+            SaveBank();
         }
 
         private void SaveBank()
@@ -117,58 +178,166 @@ namespace Gw2Giveaway
 
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
+            SaveSettings();
             SaveBank();
             base.OnClosing(e);
         }
 
-        private void Connect_Click(object sender, RoutedEventArgs e)
+        private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            _twitch = new TwitchChat
-            {
-                Channel = ChannelText.Text.ToLower(),
-                BotName = BotNameText.Text.ToLower(),
-                OAuth = "oauth:" + OAuthBox.Password,
-                EntryCommand = EntryCommandText.Text
-            };
-
-            _twitch.NewEntrant += user => Dispatcher.Invoke(() => Entrants.Add(user));
-            _twitch.Connect();
+            if (e.ChangedButton == MouseButton.Left)
+                DragMove();
         }
 
-        private async void FetchItem_Click(object sender, RoutedEventArgs e)
+        private void MinimizeWindow_Click(object sender, RoutedEventArgs e)
         {
-            if (!int.TryParse(ItemIdText.Text, out int id)) return;
+            WindowState = WindowState.Minimized;
+        }
 
+        private void Close_Click(object sender, RoutedEventArgs e)
+        {
+            Close();
+        }
+
+        private void Connect_Click(object sender, RoutedEventArgs e)
+        {
+            SaveSettings();
+
+            if (string.IsNullOrWhiteSpace(ChannelText.Text) || string.IsNullOrWhiteSpace(OAuthBox.Password))
+            {
+                MessageBox.Show("Please fill in Channel and OAuth.");
+                TwitchStatus.Text = "Error: Missing info";
+                TwitchStatus.Foreground = Brushes.Red;
+                return;
+            }
+
+            TwitchStatus.Text = "Connecting...";
+            TwitchStatus.Foreground = Brushes.Orange;
+
+            try
+            {
+                _twitch = new TwitchChat
+                {
+                    Channel = ChannelText.Text.Trim().ToLower(),
+                    BotName = BotNameText.Text.Trim().ToLower(),
+                    OAuth = "oauth:" + OAuthBox.Password.Trim(),
+                    EntryMode = _settings.EntryType,
+                    EntryCommand = _settings.EntryCommand
+                };
+
+                _twitch.OnConnected += () =>
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        TwitchStatus.Text = "Connected!";
+                        TwitchStatus.Foreground = Brushes.LimeGreen;
+                    });
+                };
+
+                _twitch.OnJoinedChannel += () =>
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        TwitchStatus.Text = "Joined channel!";
+                        TwitchStatus.Foreground = Brushes.LimeGreen;
+                    });
+                };
+
+                _twitch.OnConnectionError += error =>
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        TwitchStatus.Text = "Connection failed";
+                        TwitchStatus.Foreground = Brushes.Red;
+                        MessageBox.Show($"Twitch connection failed: {error}");
+                    });
+                };
+
+                _twitch.NewEntrant += user => Dispatcher.Invoke(() =>
+                {
+                    if (!Entrants.Contains(user))
+                        Entrants.Add(user);
+                });
+
+                _twitch.Connect();
+            }
+            catch (Exception ex)
+            {
+                TwitchStatus.Text = "Error";
+                TwitchStatus.Foreground = Brushes.Red;
+                MessageBox.Show($"Error starting connection: {ex.Message}");
+            }
+        }
+
+        private void ManualAddEntry_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new InputDialog("Enter username for manual entry:", "");
+            if (dlg.ShowDialog() == true && !string.IsNullOrWhiteSpace(dlg.Result))
+            {
+                string user = dlg.Result.Trim();
+                if (!Entrants.Contains(user))
+                    Entrants.Add(user);
+            }
+        }
+
+        private void ClassicPrizeFetch_Click(object sender, RoutedEventArgs e)
+        {
+            string input = ClassicPrizeInputText.Text.Trim();
+            if (int.TryParse(input, out int id))
+            {
+                FetchClassicItem(id);
+            }
+            else if (Uri.TryCreate(input, UriKind.Absolute, out _))
+            {
+                LoadClassicPreview(input);
+                ClassicPrizeNameText.Text = "Custom Prize";
+            }
+        }
+
+        private async void FetchClassicItem(int id)
+        {
             try
             {
                 string json = await _httpClient.GetStringAsync($"https://api.guildwars2.com/v2/items/{id}");
                 using JsonDocument doc = JsonDocument.Parse(json);
                 JsonElement root = doc.RootElement;
-
                 string name = root.GetProperty("name").GetString()!;
                 string icon = root.GetProperty("icon").GetString()!;
-
-                PrizeNameText.Text = name;
-                ImageUrlText.Text = icon;
-                LoadPreview(icon);
-                _overlay?.UpdatePrize(name, icon);
+                ClassicPrizeNameText.Text = name;
+                ClassicPrizeInputText.Text = icon;
+                LoadClassicPreview(icon);
             }
-            catch (Exception ex)
+            catch
             {
-                MessageBox.Show("Error fetching item: " + ex.Message);
+                MessageBox.Show("Item not found");
             }
         }
 
-        private void LoadPreview(string url)
+        private void LoadClassicPreview(string url)
         {
             if (!string.IsNullOrEmpty(url))
-                PrizePreview.Source = new BitmapImage(new Uri(url));
+                ClassicPrizePreview.Source = new BitmapImage(new Uri(url));
+            else
+                ClassicPrizePreview.Source = null;
+
+            _overlay?.UpdatePrize(ClassicPrizeNameText.Text, url);
+        }
+
+        private void SelectClassicPrizeItem_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new ItemSelectorDialog();
+            if (dialog.ShowDialog() == true && dialog.SelectedItem != null)
+            {
+                ClassicPrizeNameText.Text = dialog.SelectedItem.Name;
+                ClassicPrizeInputText.Text = dialog.SelectedItem.Icon;
+                LoadClassicPreview(dialog.SelectedItem.Icon);
+            }
         }
 
         private void ShowOverlay_Click(object sender, RoutedEventArgs e)
         {
             _overlay ??= new OverlayWindow();
-            _overlay.UpdatePrize(PrizeNameText.Text, ImageUrlText.Text);
+            _overlay.UpdatePrize(ClassicPrizeNameText.Text, ClassicPrizeInputText.Text);
             _overlay.Show();
             _overlay.Activate();
         }
@@ -181,42 +350,82 @@ namespace Gw2Giveaway
                 return;
             }
 
-            if (_overlay == null)
-            {
-                MessageBox.Show("Open the overlay first!");
-                return;
-            }
+            SaveSettings();
 
             Random rnd = new Random();
             int winnerIndex = rnd.Next(Entrants.Count);
             string winner = Entrants[winnerIndex];
 
-            var entrantsList = new List<string>(Entrants);
-            _overlay.StartRolling(entrantsList, winner, winnerIndex);
+            string prizeName;
+            string prizeText;
+            BitmapImage? prizeIcon = null;
+            long amount = 1;
 
-            _twitch?.SendMessage($"The winner is @{winner}! Congrats on the {PrizeNameText.Text}!");
-        }
-
-        private void ClearEntrants_Click(object sender, RoutedEventArgs e)
-        {
-            Entrants.Clear();
-            _overlay?.ResetToPrize();
-        }
-
-        private void SelectClassicPrizeItem_Click(object sender, RoutedEventArgs e)
-        {
-            var dialog = new ItemSelectorDialog();
-            if (dialog.ShowDialog() == true && dialog.SelectedItem != null)
+            if (_settings.CurrentRollMode == RollMode.ClassicWheel)
             {
-                PrizeNameText.Text = dialog.SelectedItem.Name;
-                ImageUrlText.Text = dialog.SelectedItem.Icon;
-                LoadPreview(ImageUrlText.Text);
-                _overlay?.UpdatePrize(PrizeNameText.Text, ImageUrlText.Text);
+                prizeName = ClassicPrizeNameText.Text;
+                prizeText = _settings.WinnerPrizeTemplate.Replace("{amount}", "1").Replace("{prize}", prizeName);
+                if (!string.IsNullOrEmpty(ClassicPrizeInputText.Text))
+                    prizeIcon = new BitmapImage(new Uri(ClassicPrizeInputText.Text));
+
+                var entrantsList = new List<string>(Entrants);
+                _overlay?.StartRolling(entrantsList, winner, winnerIndex, prizeIcon, prizeText);
             }
+            else
+            {
+                // Bank modes – win is declared here so it's in scope for ConsumePrize and the rest
+                PrizeWin? win = Bank.GetRandomPrize();
+                if (win == null)
+                {
+                    MessageBox.Show("No prizes in the bank!");
+                    return;
+                }
+
+                // NEW: Deplete the prize stack (only for items)
+                Bank.ConsumePrize(win);
+                SaveBank(); // persist the depletion immediately
+
+                amount = win.WinAmount;
+                prizeName = win.IsGold ? "Gold" : (win.CustomName ?? win.WinItem?.Name ?? "Prize");
+                prizeText = _settings.WinnerPrizeTemplate.Replace("{amount}", amount.ToString()).Replace("{prize}", prizeName);
+
+                string iconUrl = win.IsGold ? "pack://application:,,,/Images/Gold_coin.png" : (win.CustomIconUrl ?? win.WinItem?.Icon);
+                if (!string.IsNullOrEmpty(iconUrl))
+                    prizeIcon = new BitmapImage(new Uri(iconUrl));
+
+                if (_settings.CurrentRollMode == RollMode.BankAnimation)
+                {
+                    if (_bankWindow == null || !_bankWindow.IsLoaded)
+                    {
+                        LoadBankFromFile();
+                        Bank.Hydrate();
+                        _bankWindow = new BankWindow(Bank, SaveBank, _settings.ShowPrizeRarityBadges);
+                        _bankWindow.Show();
+                    }
+                    _bankWindow.StartRoll(win, winner);
+                    _bankWindow.Activate();
+                }
+                else // BankRandom
+                {
+                    _overlay?.ShowBankWinner(winner, prizeIcon, prizeText);
+                }
+            }
+
+            string chatPrize = amount > 1 ? $"{amount} × {prizeName}" : prizeName;
+            if (_settings.CurrentRollMode != RollMode.ClassicWheel && prizeName == "Gold")
+                chatPrize = $"{amount} Gold";
+
+            string chatMsg = _settings.ChatTemplate
+                .Replace("{winner}", winner)
+                .Replace("{prize}", chatPrize)
+                .Replace("{amount}", amount.ToString());
+
+            _twitch?.SendMessage(chatMsg);
         }
 
         private async void OpenPrizeBank_Click(object sender, RoutedEventArgs e)
         {
+            // Ensure item database is loaded (for icons/names in bank)
             if (Gw2ItemDatabase.Items.Count == 0)
             {
                 try
@@ -226,42 +435,33 @@ namespace Gw2Giveaway
                 catch (Exception ex)
                 {
                     MessageBox.Show($"Failed to load item database: {ex.Message}");
+                    return;
                 }
             }
 
+            // Load the prize bank from file
             LoadBankFromFile();
             Bank.Hydrate();
 
-            var bankWindow = new BankWindow(Bank, SaveBank);
-            bankWindow.Show();
-            bankWindow.Activate();
+            // Always create a fresh BankWindow instance (prevents "window closed" crash)
+            _bankWindow = new BankWindow(Bank, SaveBank, _settings.ShowPrizeRarityBadges);
+
+            // Clean up reference when bank window is closed
+            _bankWindow.Closed += (s, ev) => _bankWindow = null;
+
+            _bankWindow.Show();
+            _bankWindow.Activate();
         }
-        
-        private void TestPrizeRoll_Click(object sender, RoutedEventArgs e)
+
+        private void ClearEntrants_Click(object sender, RoutedEventArgs e)
         {
-            LoadBankFromFile();
-            Bank.Hydrate();
-            var bankWindow = new BankWindow(Bank, SaveBank);
-            bankWindow.Show();
-            bankWindow.Activate();
+            Entrants.Clear();
 
-            var userDlg = new InputDialog("Enter username for test roll:", "viewername");
-            if (userDlg.ShowDialog() != true || string.IsNullOrWhiteSpace(userDlg.Result))
-                return;
+            // Reset overlay to prize screen
+            _overlay?.ResetToPrize();
 
-            string user = userDlg.Result.Trim();
-
-            PrizeWin? win = Bank.GetRandomPrize();
-            if (win == null)
-            {
-                MessageBox.Show("No prizes in the bank yet!");
-                return;
-            }
-
-            string prizeDesc = win.IsGold ? $"{win.WinAmount} Gold" : $"{win.WinAmount} × {win.WinItem?.Name}";
-            _twitch?.SendMessage($"@{user} redeemed and won {prizeDesc}! Congrats!");
-
-            bankWindow.StartRoll(win, user);
+            // Clear seen users for AllChatters mode (so everyone can enter again next giveaway)
+            _twitch?.ClearSeenUsers();
         }
     }
 }

@@ -63,7 +63,28 @@ namespace Gw2Giveaway
                 }
             }
         }
+        // 1. Add this method to PrizeBank class (consumes the won amount from the slot)
+        public void ConsumePrize(PrizeWin win)
+        {
+            if (win.IsGold || win.Row < 0 || win.Col < 0)
+                return; // Gold doesn't deplete
 
+            var slot = Slots[win.Row, win.Col];
+
+            // Safe cast – GiveawayAmount is always int (1-250) for items
+            slot.DisplayStack -= (int)win.WinAmount;
+
+            if (slot.DisplayStack <= 0)
+            {
+                slot.Item = null;
+                slot.ItemId = 0;
+                slot.CustomName = null;
+                slot.CustomIconUrl = null;
+                slot.DisplayStack = 0;
+                slot.GiveawayAmount = 1;
+                slot.PrizeRarity = PrizeRarity.Common;
+            }
+        }
         public PrizeWin? GetRandomPrize()
         {
             // Define weights (adjust these numbers to balance – higher = more common)

@@ -154,17 +154,17 @@ WindowStartupLocation="CenterScreen">
 
                                         <!-- NEW: Prize Rarity Badge (top-left) -->
                                         <Border Background="{Binding PrizeRarity, Converter={StaticResource PrizeRarityToBrushConverter}}"
-                                                CornerRadius="10"
-                                                Padding="6,2,6,2"
-                                                HorizontalAlignment="Left"
-                                                VerticalAlignment="Top"
-                                                Margin="3"
-                                                Opacity="0.9"
-                                                Visibility="{Binding HasPrize, Converter={StaticResource BoolToVisibilityConverter}}">
-                                            <TextBlock Text="{Binding PrizeRarity, Converter={StaticResource PrizeRarityToTextConverter}}"
-                                                       Foreground="Black"
-                                                       FontWeight="Bold"
-                                                       FontSize="16"/>
+                                            CornerRadius="10"
+                                            Padding="10,6"
+                                            HorizontalAlignment="Left"
+                                            VerticalAlignment="Top"
+                                            Margin="12"
+                                            Opacity="0.9"
+                                            Visibility="{Binding ShowPrizeRarityBadges, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                                        <TextBlock Text="{Binding PrizeRarity, Converter={StaticResource PrizeRarityToTextConverter}}"
+                                                   Foreground="Black"
+                                                   FontWeight="Bold"
+                                                   FontSize="18"/>  
                                         </Border>
                                     </Grid>
                                 </Border>

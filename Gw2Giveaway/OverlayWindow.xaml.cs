@@ -1,7 +1,11 @@
-﻿using System.Windows;
+﻿using System;
+using System.Collections.Generic;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
+using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 
 namespace Gw2Giveaway
@@ -16,11 +20,34 @@ namespace Gw2Giveaway
             InitializeComponent();
         }
 
+        private void Window_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == System.Windows.Input.MouseButton.Left)
+                DragMove();
+        }
+
+        private void Close_Click(object sender, RoutedEventArgs e)
+        {
+            Hide(); // Hide instead of close – keeps instance alive for reuse
+        }
+
         public void UpdatePrize(string name, string imageUrl)
         {
             PrizeTitleText.Text = $"Win: {name}";
             if (!string.IsNullOrEmpty(imageUrl))
-                PrizeImage.Source = new System.Windows.Media.Imaging.BitmapImage(new Uri(imageUrl));
+            {
+                var bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.UriSource = new Uri(imageUrl);
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.EndInit();
+                bitmap.Freeze();
+                PrizeImage.Source = bitmap;
+            }
+            else
+            {
+                PrizeImage.Source = null;
+            }
 
             PrizeGrid.Visibility = Visibility.Visible;
             WheelGrid.Visibility = Visibility.Collapsed;
@@ -32,7 +59,18 @@ namespace Gw2Giveaway
             UpdatePrize(PrizeTitleText.Text.Replace("Win: ", ""), PrizeImage.Source?.ToString() ?? "");
         }
 
-        public void StartRolling(List<string> entrants, string winner, int winnerIndex)
+        public void ShowBankWinner(string user, BitmapImage? icon, string prizeText)
+        {
+            PrizeGrid.Visibility = Visibility.Collapsed;
+            WheelGrid.Visibility = Visibility.Collapsed;
+            WinnerGrid.Visibility = Visibility.Visible;
+
+            WinnerNameText.Text = $"@{user}";
+            WinnerPrizeImage.Source = icon ?? new BitmapImage(new Uri("pack://application:,,,/Images/Gold_coin.png"));
+            WinnerPrizeText.Text = prizeText;
+        }
+
+        public void StartRolling(List<string> entrants, string winner, int winnerIndex, BitmapImage? prizeIcon = null, string prizeText = "")
         {
             PrizeGrid.Visibility = Visibility.Collapsed;
             WinnerGrid.Visibility = Visibility.Collapsed;
@@ -61,15 +99,16 @@ namespace Gw2Giveaway
             sb.Completed += (_, __) =>
             {
                 _currentAngle = to % 360;
+
                 if (winnerIndex < _segmentPaths.Count)
                     _segmentPaths[winnerIndex].Fill = Brushes.Gold;
 
-                // Switch to winner screen
                 WinnerGrid.Visibility = Visibility.Visible;
                 WheelGrid.Visibility = Visibility.Collapsed;
+
                 WinnerNameText.Text = $"@{winner}";
-                WinnerPrizeImage.Source = PrizeImage.Source;
-                WinnerPrizeText.Text = PrizeTitleText.Text;
+                WinnerPrizeImage.Source = prizeIcon ?? PrizeImage.Source;
+                WinnerPrizeText.Text = !string.IsNullOrEmpty(prizeText) ? prizeText : PrizeTitleText.Text;
             };
 
             sb.Begin();
@@ -82,13 +121,18 @@ namespace Gw2Giveaway
 
             if (entrants.Count == 0) return;
 
-            double centerX = 400;
-            double centerY = 400;
-            double radius = 370;
+            double centerX = 500;
+            double centerY = 500;
+            double radius = 480;
 
             double angleStep = 360.0 / entrants.Count;
 
-            List<Color> colors = new() { Colors.RoyalBlue, Colors.Crimson, Colors.DarkGreen, Colors.Orange, Colors.Purple, Colors.DeepPink };
+            // Better color palette (GW2-inspired)
+            List<Color> colors = new()
+            {
+                Colors.RoyalBlue, Colors.Crimson, Colors.ForestGreen, Colors.OrangeRed,
+                Colors.Purple, Colors.DeepPink, Colors.DarkOrange, Colors.MediumVioletRed
+            };
 
             for (int i = 0; i < entrants.Count; i++)
             {
@@ -96,7 +140,7 @@ namespace Gw2Giveaway
                 Color color = colors[i % colors.Count];
                 SolidColorBrush brush = new SolidColorBrush(color);
 
-                // Segment
+                // Segment geometry
                 StreamGeometry geo = new StreamGeometry();
                 using (StreamGeometryContext ctx = geo.Open())
                 {
@@ -110,11 +154,11 @@ namespace Gw2Giveaway
                     ctx.LineTo(center, true, false);
                 }
 
-                Path segment = new Path { Data = geo, Fill = brush };
+                Path segment = new Path { Data = geo, Fill = brush, Stroke = Brushes.Black, StrokeThickness = 4 };
                 RotatableCanvas.Children.Add(segment);
                 _segmentPaths.Add(segment);
 
-                // Text
+                // Username text
                 string name = entrants[i];
                 double textAngle = startAngle + angleStep / 2;
                 double textRadius = radius * 0.75;
@@ -124,14 +168,15 @@ namespace Gw2Giveaway
                     Text = name,
                     Foreground = Brushes.White,
                     FontWeight = FontWeights.Bold,
-                    FontSize = Math.Max(10, 36 - entrants.Count / 3)
+                    FontSize = Math.Max(16, 48 - entrants.Count / 2),
+                    Effect = new DropShadowEffect { Color = Colors.Black, ShadowDepth = 2, BlurRadius = 4 }
                 };
 
-                double rotation = (textAngle > 90 && textAngle < 270) ? 180 : 0;
-                tb.RenderTransformOrigin = new Point(0.5, 0.5);
+                double rotation = (textAngle > 90 && textAngle < 270) ? textAngle + 180 : textAngle;
                 tb.RenderTransform = new RotateTransform(rotation);
+                tb.RenderTransformOrigin = new Point(0.5, 0.5);
 
-                tb.Measure(new Size(300, 100));
+                tb.Measure(new Size(400, 100));
                 Size size = tb.DesiredSize;
 
                 Point textPos = GetPoint(centerX, centerY, textRadius, textAngle);

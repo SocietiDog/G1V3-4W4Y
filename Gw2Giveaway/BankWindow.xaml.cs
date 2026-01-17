@@ -12,12 +12,16 @@ namespace Gw2Giveaway
     {
         private readonly Action _saveCallback;
         private SlotViewModel _currentHighlightedSlot;
-
-        public BankWindow(PrizeBank bank, Action saveCallback)
+        public bool ShowPrizeRarityBadges { get; set; } = true;
+        
+        public BankWindow(PrizeBank bank, Action saveCallback, bool showRarityBadges = true)
         {
             InitializeComponent();
+            ShowPrizeRarityBadges = showRarityBadges;
             _saveCallback = saveCallback;
-            DataContext = new BankViewModel(bank, _saveCallback);
+            var vm = new BankViewModel(bank, _saveCallback);
+            vm.ShowPrizeRarityBadges = showRarityBadges;
+            DataContext = vm;
         }
 
         private void CloseApp_Click(object sender, RoutedEventArgs e)

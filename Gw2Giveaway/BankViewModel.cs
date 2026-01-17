@@ -21,7 +21,7 @@ namespace Gw2Giveaway
         public string Description => Slot.Item?.Description ?? "";
         public bool IsGw2Item => Slot.Item != null;
         public ICommand SetPrizeRarityCommand { get; }
-
+       // public bool ShowPrizeRarityBadges { get; set; } = true;
         // In constructor
 
         private readonly Action _save;
@@ -163,7 +163,7 @@ namespace Gw2Giveaway
     public class BankViewModel : INotifyPropertyChanged
     {
         public ObservableCollection<SlotViewModel> Slots { get; } = new();
-
+        public bool ShowPrizeRarityBadges { get; set; } = true;
         private long _goldAmount;
         public long GoldAmount
         {
