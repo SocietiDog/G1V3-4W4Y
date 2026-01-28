@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Net.Http;
@@ -7,7 +8,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using Newtonsoft.Json;
+using System.Windows.Threading;
 
 namespace Gw2Giveaway
 {
@@ -17,13 +18,16 @@ namespace Gw2Giveaway
         private TwitchChat? _twitch;
         private OverlayWindow? _overlay;
         private BankWindow? _bankWindow;
+        private bool _entriesOpen = false;
+        private DispatcherTimer _entryTimer;
+        private int _entryTimeSeconds = 300;
         public PrizeBank Bank { get; private set; } = new();
         private readonly HttpClient _httpClient = new HttpClient();
         private static readonly string DataFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data");
         private static readonly string BankFile = Path.Combine(DataFolder, "prizebank.json");
         private static readonly string SettingsFile = Path.Combine(DataFolder, "settings.json");
         private AppSettings _settings = new();
-
+        private ObservableCollection<ChannelPointReward> _channelPointRewards = new();
         public MainWindow()
         {
             InitializeComponent();
@@ -56,6 +60,7 @@ namespace Gw2Giveaway
             ClassicPrizeNameText.Text = _settings.ClassicPrizeName;
             ClassicPrizeInputText.Text = _settings.ClassicPrizeIconUrl;
             LoadClassicPreview(_settings.ClassicPrizeIconUrl);
+            _channelPointRewards = _settings.ChannelPointRewards;
         }
 
         private void SaveSettings()
@@ -71,7 +76,8 @@ namespace Gw2Giveaway
             _settings.ShowPrizeRarityBadges = ShowRarityBadgesCheck.IsChecked == true;
             _settings.ClassicPrizeName = ClassicPrizeNameText.Text;
             _settings.ClassicPrizeIconUrl = ClassicPrizeInputText.Text;
-
+            _settings.ChannelPointRewards = _channelPointRewards;
+            _overlay?.UpdateEntryInstruction(EntryCommandText.Text);
             try
             {
                 string json = JsonConvert.SerializeObject(_settings, Formatting.Indented);
@@ -206,8 +212,6 @@ namespace Gw2Giveaway
             if (string.IsNullOrWhiteSpace(ChannelText.Text) || string.IsNullOrWhiteSpace(OAuthBox.Password))
             {
                 MessageBox.Show("Please fill in Channel and OAuth.");
-                TwitchStatus.Text = "Error: Missing info";
-                TwitchStatus.Foreground = Brushes.Red;
                 return;
             }
 
@@ -229,18 +233,16 @@ namespace Gw2Giveaway
                 {
                     Dispatcher.Invoke(() =>
                     {
-                        TwitchStatus.Text = "Connected!";
+                        TwitchStatus.Text = "Connected & Joined!";
                         TwitchStatus.Foreground = Brushes.LimeGreen;
+                        ConnectButton.IsEnabled = false;
+                        DisconnectButton.IsEnabled = true;
                     });
                 };
 
                 _twitch.OnJoinedChannel += () =>
                 {
-                    Dispatcher.Invoke(() =>
-                    {
-                        TwitchStatus.Text = "Joined channel!";
-                        TwitchStatus.Foreground = Brushes.LimeGreen;
-                    });
+                    // Already handled in OnConnected for simplicity
                 };
 
                 _twitch.OnConnectionError += error =>
@@ -250,14 +252,15 @@ namespace Gw2Giveaway
                         TwitchStatus.Text = "Connection failed";
                         TwitchStatus.Foreground = Brushes.Red;
                         MessageBox.Show($"Twitch connection failed: {error}");
+                        ConnectButton.IsEnabled = true;
+                        DisconnectButton.IsEnabled = false;
                     });
                 };
 
-                _twitch.NewEntrant += user => Dispatcher.Invoke(() =>
-                {
-                    if (!Entrants.Contains(user))
-                        Entrants.Add(user);
-                });
+                // NEW: Subscribe to raw messages (for entry period control)
+                _twitch.OnMessageReceived += Twitch_OnMessageReceived;
+
+                // REMOVED NewEntrant subscription – we handle entrants manually now
 
                 _twitch.Connect();
             }
@@ -265,10 +268,18 @@ namespace Gw2Giveaway
             {
                 TwitchStatus.Text = "Error";
                 TwitchStatus.Foreground = Brushes.Red;
-                MessageBox.Show($"Error starting connection: {ex.Message}");
+                MessageBox.Show($"Error: {ex.Message}");
             }
         }
+        private void Disconnect_Click(object sender, RoutedEventArgs e)
+        {
+            _twitch?.Disconnect();
 
+            ConnectButton.IsEnabled = true;
+            DisconnectButton.IsEnabled = false;
+            TwitchStatus.Text = "Disconnected";
+            TwitchStatus.Foreground = Brushes.Red;
+        }
         private void ManualAddEntry_Click(object sender, RoutedEventArgs e)
         {
             var dlg = new InputDialog("Enter username for manual entry:", "");
@@ -336,10 +347,36 @@ namespace Gw2Giveaway
 
         private void ShowOverlay_Click(object sender, RoutedEventArgs e)
         {
+            SaveSettings();
             _overlay ??= new OverlayWindow();
             _overlay.UpdatePrize(ClassicPrizeNameText.Text, ClassicPrizeInputText.Text);
+
+            // NEW: Update the entry command text in overlay
+            _overlay.UpdateEntryInstruction(_settings.EntryCommand);
+
             _overlay.Show();
             _overlay.Activate();
+        }
+        private void GenerateTestEntrants_Click(object sender, RoutedEventArgs e)
+        {
+            if (!int.TryParse(TestEntrantsCountText.Text, out int count) || count <= 0)
+            {
+                MessageBox.Show("Enter a valid number > 0");
+                return;
+            }
+
+            Random rnd = new Random();
+            string[] prefixes = { "Viewer", "Gamer", "Twitch", "Stream", "Chat", "Hype", "Legend", "Pro", "Noob", "Boss" };
+            string[] suffixes = { "123", "XYZ", "King", "Queen", "Cat", "Dog", "Ninja", "Wizard", "Dragon", "Phoenix" };
+
+            for (int i = 0; i < count; i++)
+            {
+                string username = prefixes[rnd.Next(prefixes.Length)] + suffixes[rnd.Next(suffixes.Length)] + rnd.Next(1000);
+                if (!Entrants.Contains(username))
+                    Entrants.Add(username);
+            }
+
+            MessageBox.Show($"Added {count} random test entrants!");
         }
 
         private void StartRoll_Click(object sender, RoutedEventArgs e)
@@ -369,7 +406,9 @@ namespace Gw2Giveaway
                     prizeIcon = new BitmapImage(new Uri(ClassicPrizeInputText.Text));
 
                 var entrantsList = new List<string>(Entrants);
-                _overlay?.StartRolling(entrantsList, winner, winnerIndex, prizeIcon, prizeText);
+                //_overlay?.StartRolling(entrantsList, winner, winnerIndex, prizeIcon, prizeText);
+                //_overlay?.StartScramble(entrantsList, winner);
+                _overlay?.StartSlotMachine(entrantsList, winner);
             }
             else
             {
@@ -463,5 +502,192 @@ namespace Gw2Giveaway
             // Clear seen users for AllChatters mode (so everyone can enter again next giveaway)
             _twitch?.ClearSeenUsers();
         }
+        private void AddChannelPointReward_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(NewRewardTitleText.Text))
+                return;
+
+            var reward = new ChannelPointReward
+            {
+                Title = NewRewardTitleText.Text.Trim(),
+                Cost = int.TryParse(NewRewardCostText.Text, out int cost) ? cost : 100,
+                Action = (ChannelPointAction)NewRewardActionCombo.SelectedIndex,
+                InstantGoldAmount = long.TryParse(NewRewardGoldText.Text, out long gold) ? gold : 0
+            };
+
+            _channelPointRewards.Add(reward);
+
+            // Clear fields for next
+            NewRewardTitleText.Text = "New Reward";
+            NewRewardCostText.Text = "100";
+            NewRewardActionCombo.SelectedIndex = 0;
+            NewRewardGoldText.Text = "0";
+
+            SaveSettings();
+        }
+
+        private void ManualRedeem_Click(object sender, RoutedEventArgs e)
+        {
+            if (RedeemRewardCombo.SelectedItem is not ChannelPointReward reward)
+            {
+                MessageBox.Show("Select a reward");
+                return;
+            }
+
+            string username = RedeemUsernameText.Text.Trim();
+            if (string.IsNullOrWhiteSpace(username))
+            {
+                MessageBox.Show("Enter username");
+                return;
+            }
+
+            switch (reward.Action)
+            {
+                case ChannelPointAction.AddToEntrants:
+                    if (!Entrants.Contains(username))
+                        Entrants.Add(username);
+                    _twitch?.SendMessage($"@{username} redeemed {reward.Title} and joined the giveaway!");
+                    break;
+
+                case ChannelPointAction.InstantBankRoll:
+                    InstantBankRollForUser(username);
+                    break;
+
+                case ChannelPointAction.InstantGoldWin:
+                    if (reward.InstantGoldAmount > 0)
+                    {
+                        // You could add gold to a user database if you have one, or just announce
+                        _twitch?.SendMessage($"@{username} redeemed {reward.Title} and won {reward.InstantGoldAmount} Gold!");
+                    }
+                    break;
+            }
+
+            RedeemUsernameText.Text = "";
+        }
+
+        private void InstantBankRollForUser(string username)
+        {
+            PrizeWin? win = Bank.GetRandomPrize();
+            if (win == null)
+            {
+                _twitch?.SendMessage($"@{username} redeemed a channel point but no prizes left in bank!");
+                return;
+            }
+
+            Bank.ConsumePrize(win);
+            SaveBank();
+
+            long amount = win.WinAmount;
+            string prizeName = win.IsGold ? "Gold" : (win.CustomName ?? win.WinItem?.Name ?? "Prize");
+            string prizeText = _settings.WinnerPrizeTemplate.Replace("{amount}", amount.ToString()).Replace("{prize}", prizeName);
+
+            string iconUrl = win.IsGold ? "pack://application:,,,/Images/Gold_coin.png" : (win.CustomIconUrl ?? win.WinItem?.Icon);
+            BitmapImage? prizeIcon = !string.IsNullOrEmpty(iconUrl) ? new BitmapImage(new Uri(iconUrl)) : null;
+
+            // Show in overlay as instant winner
+            _overlay?.ShowBankWinner(username, prizeIcon, prizeText);
+
+            string chatPrize = amount > 1 ? $"{amount} × {prizeName}" : prizeName;
+            if (prizeName == "Gold") chatPrize = $"{amount} Gold";
+
+            _twitch?.SendMessage($"@{username} redeemed channel point and instantly won {chatPrize}! Congrats!");
+        }
+        private void RemoveChannelPointReward_Click(object sender, RoutedEventArgs e)
+        {
+            if (ChannelPointRewardsList.SelectedItem is ChannelPointReward selectedReward)
+            {
+                _channelPointRewards.Remove(selectedReward);
+                SaveSettings(); // persist the removal
+            }
+            else
+            {
+                MessageBox.Show("Select a reward from the list to remove it.");
+            }
+        }
+        private void StartEntries_Click(object sender, RoutedEventArgs e)
+        {
+            if (_entriesOpen)
+            {
+                MessageBox.Show("Entries already open!");
+                return;
+            }
+
+            if (!int.TryParse(EntryTimeText.Text, out _entryTimeSeconds) || _entryTimeSeconds < 0)
+                _entryTimeSeconds = 0;
+
+            _entriesOpen = true;
+            Entrants.Clear(); // fresh list for new period
+            _twitch?._seenUsers.Clear();
+
+            string timeMsg = _entryTimeSeconds > 0 ? $" for {TimeSpan.FromSeconds(_entryTimeSeconds):mm\\:ss} minutes" : " (unlimited)";
+            _twitch?.SendMessage($"Giveaway entries OPEN{timeMsg}! Type {_settings.EntryCommand} to join!");
+
+            EntryStatusText.Text = _entryTimeSeconds > 0 ? $"Entries Open – {_entryTimeSeconds}s remaining" : "Entries Open (unlimited)";
+            EntryStatusText.Foreground = Brushes.LimeGreen;
+
+            if (_entryTimeSeconds > 0)
+            {
+                _entryTimer = new DispatcherTimer();
+                _entryTimer.Interval = TimeSpan.FromSeconds(1);
+                _entryTimer.Tick += EntryTimer_Tick;
+                _entryTimer.Start();
+            }
+        }
+
+        private void StopEntries_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_entriesOpen)
+            {
+                MessageBox.Show("Entries not open!");
+                return;
+            }
+
+            _entriesOpen = false;
+            _entryTimer?.Stop();
+
+            _twitch?.SendMessage($"Giveaway entries CLOSED! Total entrants: {Entrants.Count}");
+
+            EntryStatusText.Text = "Entries: Closed";
+            EntryStatusText.Foreground = Brushes.Red;
+        }
+
+        private void EntryTimer_Tick(object? sender, EventArgs e)
+        {
+            _entryTimeSeconds--;
+            if (_entryTimeSeconds <= 0)
+            {
+                StopEntries_Click(null, null); // auto-close
+                return;
+            }
+
+            EntryStatusText.Text = $"Entries Open – {_entryTimeSeconds}s remaining";
+        }
+
+        // Updated Twitch_OnMessageReceived – wrap collection changes in Dispatcher.Invoke
+        private void Twitch_OnMessageReceived(string username, string message)
+        {
+            if (!_entriesOpen) return; // only during open entry period
+
+            username = username.ToLowerInvariant();
+
+            Dispatcher.Invoke(() =>
+            {
+                if (_settings.EntryType == EntryMode.Command)
+                {
+                    if (message.Equals(_settings.EntryCommand, StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!Entrants.Contains(username))
+                            Entrants.Add(username);
+                    }
+                }
+                else if (_settings.EntryType == EntryMode.AllChatters)
+                {
+                    if (!Entrants.Contains(username))
+                        Entrants.Add(username);
+                }
+            });
+        }
+
+
     }
 }

@@ -1,5 +1,6 @@
-﻿using System.IO;
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
+using System.Collections.ObjectModel;
+using System.IO;
 
 namespace Gw2Giveaway
 {
@@ -31,5 +32,20 @@ namespace Gw2Giveaway
         public bool ShowPrizeRarityBadges { get; set; } = true;
         public string ClassicPrizeName { get; set; } = "Legendary Weapon";
         public string ClassicPrizeIconUrl { get; set; } = "";
+        public ObservableCollection<ChannelPointReward> ChannelPointRewards { get; set; } = new();
+    }
+    public class ChannelPointReward
+    {
+        public string Title { get; set; } = "Channel Point Reward";
+        public int Cost { get; set; } = 100; // Display only – info for streamer
+        public ChannelPointAction Action { get; set; } = ChannelPointAction.AddToEntrants;
+        public long InstantGoldAmount { get; set; } = 0; // If instant gold win
+    }
+
+    public enum ChannelPointAction
+    {
+        AddToEntrants,
+        InstantBankRoll,
+        InstantGoldWin
     }
 }

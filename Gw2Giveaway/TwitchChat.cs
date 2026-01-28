@@ -17,6 +17,7 @@ namespace Gw2Giveaway
         public string OAuth { get; set; } = "";
         public EntryMode EntryMode { get; set; } = EntryMode.Command;
         public string EntryCommand { get; set; } = "!enter";
+        public event Action<string, string>? OnMessageReceived;
 
         private TwitchClient? _client;
         private WebSocketClient? _webSocketClient;
@@ -26,7 +27,7 @@ namespace Gw2Giveaway
         public event Action? OnJoinedChannel;
         public event Action<string>? NewEntrant;
 
-        private HashSet<string> _seenUsers = new();
+        public HashSet<string> _seenUsers = new();
 
         public TwitchChat()
         {
@@ -138,8 +139,13 @@ namespace Gw2Giveaway
         {
             OnConnectionError?.Invoke("Incorrect login – regenerate OAuth at twitchapps.com/tmi/");
         }
-
         private void Client_OnMessageReceived(object? sender, OnMessageReceivedArgs e)
+        {
+            string username = e.ChatMessage.Username;
+            string message = e.ChatMessage.Message.Trim();
+            OnMessageReceived?.Invoke(username, message);
+        }
+        /*private void Client_OnMessageReceived(object? sender, OnMessageReceivedArgs e)
         {
             string username = e.ChatMessage.Username.ToLowerInvariant();
             string message = e.ChatMessage.Message.Trim();
@@ -158,6 +164,6 @@ namespace Gw2Giveaway
             {
                 NewEntrant?.Invoke(username);
             }
-        }
+        }*/
     }
 }

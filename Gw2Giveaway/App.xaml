@@ -2,8 +2,23 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:Gw2Giveaway"
+             xmlns:conv="clr-namespace:Gw2Giveaway.Converters"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-        
+        <conv:BoolToBrushConverter x:Key="BoolToHighlightBrushConverter"
+                                   TrueBrush="Gold"
+                                   FalseBrush="#FFF3F3EA"/>
+        <conv:BoolToThicknessConverter x:Key="BoolToThicknessConverter"
+                                       TrueThickness="8"
+                                       FalseThickness="1"/>
+        <conv:BoolToDoubleConverter x:Key="BoolToBlurConverter"
+                                    TrueValue="25"
+                                    FalseValue="0"/>
+        <conv:RarityToBrushConverter x:Key="RarityToBrushConverter"/>
+        <conv:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <conv:PrizeRarityToBrushConverter x:Key="PrizeRarityToBrushConverter"/>
+        <conv:PrizeRarityToTextConverter x:Key="PrizeRarityToTextConverter"/>
+        <conv:ActionToVisibilityConverter x:Key="ActionToVisibilityConverter"/>
+        <conv:PercentageConverter x:Key="PercentageConverter"/>
     </Application.Resources>
 </Application>
