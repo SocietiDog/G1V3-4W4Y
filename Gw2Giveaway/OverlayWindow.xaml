@@ -1,12 +1,12 @@
 ﻿<Window x:Class="Gw2Giveaway.OverlayWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="GW2 Giveaway Overlay" Width="600" Height="600"
+        Title="GW2 Giveaway Overlay" Width="600" Height="700"
         AllowsTransparency="True" Background="Transparent" WindowStyle="None"
         ResizeMode="CanResizeWithGrip" Topmost="True"
         WindowStartupLocation="CenterScreen">
     <Window.Resources>
-        <!-- Same button style as BankWindow/MainWindow -->
+        <!-- Close button style -->
         <Style x:Key="OverlayCloseButton" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="#FFF3F3EA"/>
@@ -52,10 +52,8 @@
             <ImageBrush ImageSource="/Images/2026-02-01-23.00-02-Gw2-64.png" Opacity="0.6" Stretch="Fill"/>
         </Border.Background>
 
-        <!-- Dark overlay for better text readability (added back) -->
-        
         <Grid>
-            <!-- Small close button (top-right – subtle red on hover) -->
+            <!-- Close button -->
             <Button Content="X" Style="{StaticResource OverlayCloseButton}"
                     HorizontalAlignment="Right" VerticalAlignment="Top"
                     Click="Close_Click" Width="60" Height="60"/>
@@ -72,50 +70,62 @@
                                Foreground="White"/>
                 </StackPanel>
             </Grid>
-            <!-- Slot Machine Mode – single big vertical reel, centered, no top arrow, middle highlight -->
-            <!-- SlotGrid – updated for better box sizing and centering -->
+
+            <!-- Slot Machine Mode – Enhanced with colors -->
             <Grid x:Name="SlotGrid" Visibility="Collapsed" Background="Transparent">
                 <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Border Background="#CC000000" CornerRadius="40" BorderBrush="Gold" BorderThickness="10" Width="420" Height="620">
+                    <Border Background="#CC000000" CornerRadius="40" BorderBrush="Gold" 
+                            BorderThickness="12" Width="500" Height="650" Padding="15">
+                        <Border.Effect>
+                            <DropShadowEffect Color="Gold" ShadowDepth="0" BlurRadius="30" Opacity="0.8"/>
+                        </Border.Effect>
+
                         <Grid>
-                            <Canvas ClipToBounds="True">
-                                <StackPanel x:Name="SlotReelContent">
+                            <!-- Scrolling reel with clip -->
+                            <Canvas ClipToBounds="True" Width="470" Height="620">
+                                <StackPanel x:Name="SlotReelContent" Orientation="Vertical">
                                     <StackPanel.RenderTransform>
                                         <TranslateTransform/>
                                     </StackPanel.RenderTransform>
                                 </StackPanel>
                             </Canvas>
 
-                            <!-- Winner highlight – bigger, perfect middle framing -->
+                            <!-- Top/bottom gradient fade -->
+                            <Rectangle>
+                                <Rectangle.Fill>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Color="#FF000000" Offset="0"/>
+                                        <GradientStop Color="#00000000" Offset="0.3"/>
+                                        <GradientStop Color="#00000000" Offset="0.7"/>
+                                        <GradientStop Color="#FF000000" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Rectangle.Fill>
+                            </Rectangle>
+
+                            <!-- Winner highlight (center frame) -->
                             <Border x:Name="SlotWinnerHighlight"
-                        BorderBrush="Gold"
-                        BorderThickness="16"
-                        CornerRadius="50"
-                        Opacity="0"
-                        VerticalAlignment="Center"
-                        Height="160"
-                        IsHitTestVisible="False">
-                                <Border.Background>
-                                    <RadialGradientBrush>
-                                        <GradientStop Color="#AAFFD700" Offset="0"/>
-                                        <GradientStop Color="Transparent" Offset="1"/>
-                                    </RadialGradientBrush>
-                                </Border.Background>
+                                    BorderBrush="Gold" BorderThickness="18"
+                                    CornerRadius="50" Opacity="0"
+                                    VerticalAlignment="Center" Height="180" Width="460">
                                 <Border.Effect>
-                                    <DropShadowEffect Color="Gold" BlurRadius="50" ShadowDepth="0" Opacity="1"/>
+                                    <DropShadowEffect Color="Gold" ShadowDepth="0" BlurRadius="30" Opacity="0.8"/>
                                 </Border.Effect>
                             </Border>
+
+                            <!-- Separator lines -->
+                            <Line X1="0" Y1="310" X2="470" Y2="310" Stroke="Gold" StrokeThickness="3" Opacity="0.3"/>
+                            <Line X1="0" Y1="490" X2="470" Y2="490" Stroke="Gold" StrokeThickness="3" Opacity="0.3"/>
                         </Grid>
                     </Border>
                 </Grid>
             </Grid>
-            <!-- New Scramble Mode (replace WheelGrid) -->
+
+            <!-- Scramble Mode -->
             <Grid x:Name="ScrambleGrid" Visibility="Collapsed" Background="Transparent">
                 <ItemsControl x:Name="ScrambleItems" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <UniformGrid Columns="5" Rows="6"/>
-                            <!-- Adjust grid for your window size -->
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
@@ -136,6 +146,8 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </Grid>
+
+            <!-- Wheel Mode -->
             <StackPanel x:Name="WheelGrid" Visibility="Collapsed">
                 <Viewbox Stretch="Uniform">
                     <Canvas Width="400" Height="400">
@@ -149,11 +161,41 @@
                 </Viewbox>
             </StackPanel>
 
-            <!-- Winner Mode – balanced sizes -->
+            <!-- Winner Mode -->
             <Grid x:Name="WinnerGrid" Visibility="Collapsed">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <TextBlock Text="WINNER!" FontSize="60" Foreground="Gold" Margin="0,0,0,50"/>
                     <TextBlock x:Name="WinnerNameText" FontSize="50" Foreground="White" Margin="0,0,0,60"/>
+
+                    <!-- Prize Pool Selection Display (2 boxes - Bank vs Displayed Prize) - only shown in RandomPool mode -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,50" x:Name="PrizePoolPanel" Visibility="Collapsed">
+                        <!-- Bank Option -->
+                        <Border x:Name="BankPoolBox" Background="#AA1a1a2e" CornerRadius="20" 
+                                Padding="20" Margin="0,0,30,0" BorderBrush="#333366" BorderThickness="3"
+                                Width="160" Height="160">
+                            <Border.Effect>
+                                <DropShadowEffect x:Name="BankPoolGlow" Color="Blue" ShadowDepth="0" BlurRadius="5" Opacity="0"/>
+                            </Border.Effect>
+                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <TextBlock Text="🏦" FontSize="50" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                                <TextBlock Text="BANK" FontSize="18" Foreground="#6699FF" HorizontalAlignment="Center" FontWeight="Bold"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Displayed Prize Option -->
+                        <Border x:Name="DisplayedPoolBox" Background="#AA1a1a2e" CornerRadius="20"
+                                Padding="20" Margin="30,0,0,0" BorderBrush="#666633" BorderThickness="3"
+                                Width="160" Height="160">
+                            <Border.Effect>
+                                <DropShadowEffect x:Name="DisplayedPoolGlow" Color="Gold" ShadowDepth="0" BlurRadius="5" Opacity="0"/>
+                            </Border.Effect>
+                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <TextBlock Text="⭐" FontSize="50" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                                <TextBlock Text="PRIZE" FontSize="18" Foreground="#FFDD00" HorizontalAlignment="Center" FontWeight="Bold"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
                     <Image x:Name="WinnerPrizeImage" Width="200" Height="200" Stretch="Uniform" Margin="0,0,0,60"/>
                     <TextBlock x:Name="WinnerPrizeText" FontSize="40" Foreground="White"/>
                 </StackPanel>

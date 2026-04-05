@@ -3,6 +3,8 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Effects;
+using System.Windows.Shapes;
 
 namespace Gw2Giveaway
 {
@@ -16,27 +18,76 @@ namespace Gw2Giveaway
         public ItemSelectorDialog()
         {
             Title = "Search & Select Item";
-            Width = 650;
-            Height = 715;
+            Width = 700;
+            Height = 750;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            AllowsTransparency = true;
+            WindowStyle = WindowStyle.None;
+            Background = Brushes.Transparent;
 
-            StackPanel panel = new StackPanel { Margin = new Thickness(15) };
+            // Outer border matching app theme
+            Border outer = new Border
+            {
+                CornerRadius = new CornerRadius(16),
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFEFDFDF")),
+                BorderThickness = new Thickness(3),
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#EE1a1a2e")),
+                Padding = new Thickness(20),
+                Effect = new DropShadowEffect { Color = Colors.Black, BlurRadius = 20, ShadowDepth = 0, Opacity = 0.6 }
+            };
+            outer.MouseLeftButtonDown += (s, e) => { if (e.ChangedButton == MouseButton.Left) DragMove(); };
+
+            Grid mainGrid = new Grid();
+            mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // title bar
+            mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // header
+            mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // search box
+            mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // results
+            mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // buttons
+
+            // Title bar with close button
+            Grid titleBar = new Grid { Margin = new Thickness(0, 0, 0, 10) };
+            TextBlock titleText = new TextBlock
+            {
+                Text = "🔍 Search & Select Item",
+                FontSize = 20,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(Colors.Gold),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Button closeBtn = CreateThemedButton("✕", false);
+            closeBtn.Width = 40;
+            closeBtn.Height = 40;
+            closeBtn.FontSize = 18;
+            closeBtn.HorizontalAlignment = HorizontalAlignment.Right;
+            closeBtn.Click += (s, e) => { DialogResult = false; Close(); };
+            titleBar.Children.Add(titleText);
+            titleBar.Children.Add(closeBtn);
+            Grid.SetRow(titleBar, 0);
 
             TextBlock header = new TextBlock
             {
                 Text = "Type any part of the item name (case-insensitive)\n" +
                        "Results sorted smartly: exact match → starts with → earliest occurrence\n" +
                        "Use arrow keys + Enter, or double-click to select",
-                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CCCCCC")),
+                FontSize = 13,
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 0, 0, 10)
             };
+            Grid.SetRow(header, 1);
 
             TextBox searchBox = new TextBox
             {
-                Margin = new Thickness(0, 0, 0, 15),
-                FontSize = 16
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#AA000000")),
+                Foreground = Brushes.White,
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFEFDFDF")),
+                CaretBrush = Brushes.White,
+                FontSize = 16,
+                Padding = new Thickness(10, 8, 10, 8),
+                Margin = new Thickness(0, 0, 0, 12)
             };
+            Grid.SetRow(searchBox, 2);
+
             searchBox.TextChanged += (s, e) =>
             {
                 string query = searchBox.Text.Trim();
@@ -47,13 +98,38 @@ namespace Gw2Giveaway
                     _resultsList.SelectedIndex = 0;
             };
 
-            _resultsList = new ListBox { Height = 500 };
+            _resultsList = new ListBox
+            {
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CC000000")),
+                Foreground = Brushes.White,
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#55FFFFFF")),
+                BorderThickness = new Thickness(1),
+                Margin = new Thickness(0, 0, 0, 12)
+            };
+
+            // Style ListBoxItems for dark theme
+            var itemContainerStyle = new Style(typeof(ListBoxItem));
+            itemContainerStyle.Setters.Add(new Setter(ListBoxItem.BackgroundProperty, Brushes.Transparent));
+            itemContainerStyle.Setters.Add(new Setter(ListBoxItem.ForegroundProperty, Brushes.White));
+            itemContainerStyle.Setters.Add(new Setter(ListBoxItem.PaddingProperty, new Thickness(8, 6, 8, 6)));
+            itemContainerStyle.Setters.Add(new Setter(ListBoxItem.BorderThicknessProperty, new Thickness(0, 0, 0, 1)));
+            itemContainerStyle.Setters.Add(new Setter(ListBoxItem.BorderBrushProperty, new SolidColorBrush(Color.FromArgb(0x20, 0xFF, 0xFF, 0xFF))));
+            var hoverTrigger = new Trigger { Property = ListBoxItem.IsMouseOverProperty, Value = true };
+            hoverTrigger.Setters.Add(new Setter(ListBoxItem.BackgroundProperty, new SolidColorBrush(Color.FromArgb(0x33, 0xFF, 0xD7, 0x00))));
+            itemContainerStyle.Triggers.Add(hoverTrigger);
+            var selectedTrigger = new Trigger { Property = ListBoxItem.IsSelectedProperty, Value = true };
+            selectedTrigger.Setters.Add(new Setter(ListBoxItem.BackgroundProperty, new SolidColorBrush(Color.FromArgb(0x55, 0xFF, 0xD7, 0x00))));
+            selectedTrigger.Setters.Add(new Setter(ListBoxItem.ForegroundProperty, Brushes.White));
+            itemContainerStyle.Triggers.Add(selectedTrigger);
+            _resultsList.ItemContainerStyle = itemContainerStyle;
+
             _resultsList.MouseDoubleClick += (s, e) => SelectCurrent();
             _resultsList.KeyDown += (s, e) =>
             {
                 if (e.Key == Key.Enter)
                     SelectCurrent();
             };
+            Grid.SetRow(_resultsList, 3);
 
             // DataTemplate: Name (bold) - Rarity (orange) - ID (gray)
             DataTemplate template = new DataTemplate();
@@ -63,6 +139,7 @@ namespace Gw2Giveaway
             FrameworkElementFactory nameBlock = new FrameworkElementFactory(typeof(TextBlock));
             nameBlock.SetBinding(TextBlock.TextProperty, new Binding("Name"));
             nameBlock.SetValue(TextBlock.FontWeightProperty, FontWeights.Bold);
+            nameBlock.SetValue(TextBlock.ForegroundProperty, new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFF3F3EA")));
             nameBlock.SetValue(TextBlock.MarginProperty, new Thickness(0, 0, 20, 0));
             nameBlock.SetValue(TextBlock.MinWidthProperty, 350.0);
 
@@ -73,7 +150,7 @@ namespace Gw2Giveaway
 
             FrameworkElementFactory idBlock = new FrameworkElementFactory(typeof(TextBlock));
             idBlock.SetBinding(TextBlock.TextProperty, new Binding("Id"));
-            idBlock.SetValue(TextBlock.ForegroundProperty, Brushes.Gray);
+            idBlock.SetValue(TextBlock.ForegroundProperty, new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)));
 
             stack.AppendChild(nameBlock);
             stack.AppendChild(rarityBlock);
@@ -82,22 +159,29 @@ namespace Gw2Giveaway
             template.VisualTree = stack;
             _resultsList.ItemTemplate = template;
 
-            Button selectBtn = new Button { Content = "Select", Width = 120, Height = 35, IsDefault = true };
+            // Buttons row
+            StackPanel buttons = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right
+            };
+            Button cancelBtn = CreateThemedButton("Cancel", false);
+            cancelBtn.Click += (s, e) => { DialogResult = false; Close(); };
+            Button selectBtn = CreateThemedButton("Select", true);
             selectBtn.Click += (s, e) => SelectCurrent();
 
-            Button cancelBtn = new Button { Content = "Cancel", Width = 120, Height = 35, IsCancel = true, Margin = new Thickness(10, 0, 0, 0) };
-            cancelBtn.Click += (s, e) => { DialogResult = false; Close(); };
-
-            StackPanel buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 15, 0, 0) };
             buttons.Children.Add(cancelBtn);
             buttons.Children.Add(selectBtn);
+            Grid.SetRow(buttons, 4);
 
-            panel.Children.Add(header);
-            panel.Children.Add(searchBox);
-            panel.Children.Add(_resultsList);
-            panel.Children.Add(buttons);
+            mainGrid.Children.Add(titleBar);
+            mainGrid.Children.Add(header);
+            mainGrid.Children.Add(searchBox);
+            mainGrid.Children.Add(_resultsList);
+            mainGrid.Children.Add(buttons);
 
-            Content = panel;
+            outer.Child = mainGrid;
+            Content = outer;
 
             Loaded += (s, e) =>
             {
@@ -119,6 +203,46 @@ namespace Gw2Giveaway
             {
                 MessageBox.Show("Please select a valid item from the list.");
             }
+        }
+
+        private static Button CreateThemedButton(string text, bool isDefault)
+        {
+            Button btn = new Button
+            {
+                Content = text,
+                Width = 120,
+                Height = 38,
+                FontSize = 15,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFF3F3EA")),
+                Background = Brushes.Transparent,
+                Cursor = Cursors.Hand,
+                Margin = new Thickness(6, 0, 0, 0),
+                IsDefault = isDefault,
+                IsCancel = !isDefault
+            };
+
+            var tmpl = new ControlTemplate(typeof(Button));
+            var border = new FrameworkElementFactory(typeof(Border));
+            border.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Button.BackgroundProperty));
+            border.SetValue(Border.CornerRadiusProperty, new CornerRadius(12));
+            border.SetValue(Border.PaddingProperty, new Thickness(12, 6, 12, 6));
+            border.SetValue(Border.BorderBrushProperty, new SolidColorBrush(Color.FromArgb(0x40, 0xFF, 0xFF, 0xFF)));
+            border.SetValue(Border.BorderThicknessProperty, new Thickness(2));
+
+            var presenter = new FrameworkElementFactory(typeof(ContentPresenter));
+            presenter.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            presenter.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+            border.AppendChild(presenter);
+            tmpl.VisualTree = border;
+
+            var hover = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+            hover.Setters.Add(new Setter(Button.BackgroundProperty, new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFF3F3EA"))));
+            hover.Setters.Add(new Setter(Button.ForegroundProperty, Brushes.Black));
+            tmpl.Triggers.Add(hover);
+
+            btn.Template = tmpl;
+            return btn;
         }
     }
 }

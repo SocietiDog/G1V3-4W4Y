@@ -19,8 +19,7 @@ namespace Gw2Giveaway
             InitializeComponent();
             ShowPrizeRarityBadges = showRarityBadges;
             _saveCallback = saveCallback;
-            var vm = new BankViewModel(bank, _saveCallback);
-            vm.ShowPrizeRarityBadges = showRarityBadges;
+            var vm = new BankViewModel(bank, _saveCallback, showRarityBadges);
             DataContext = vm;
         }
 
@@ -64,13 +63,24 @@ namespace Gw2Giveaway
             base.OnClosing(e);
         }
 
-        public async void StartRoll(PrizeWin win, string user)
+        public void UpdateShowRarityBadges(bool show)
+        {
+            var vm = (BankViewModel)DataContext;
+            vm.ShowPrizeRarityBadges = show;
+            foreach (var slot in vm.Slots)
+            {
+                slot.ShowPrizeRarityBadges = show;
+            }
+        }
+
+        public async Task StartRollAsync(PrizeWin win, string user, int durationSeconds = 5)
         {
             var vm = (BankViewModel)DataContext;
 
             var filledSlots = vm.Slots.Where(s => !string.IsNullOrEmpty(s.ImageSource)).ToList();
 
             WinnerNameText.Text = $"@{user}";
+            WinnerGrid.Visibility = Visibility.Collapsed;
 
             if (win.IsGold)
             {
@@ -86,7 +96,7 @@ namespace Gw2Giveaway
                 }
                 else
                 {
-                    WinnerPrizeImage.Source = null; // or a placeholder if you want
+                    WinnerPrizeImage.Source = null;
                 }
 
                 string name = win.CustomName ?? win.WinItem?.Name ?? "Prize";
@@ -101,9 +111,23 @@ namespace Gw2Giveaway
                 _currentHighlightedSlot = null;
             }
 
+            // Scale spin count and timing based on duration
+            // Target total time ≈ durationSeconds * 1000 ms
+            // Each spin i takes: baseDelay + i * rampUp
+            // Total = spins * baseDelay + rampUp * (spins*(spins-1)/2)
+            // Solve for spins given duration
+            durationSeconds = Math.Clamp(durationSeconds, 2, 15);
+            int targetMs = durationSeconds * 1000;
+            int baseDelay = 80;
+            int rampUp = 12;
+
+            // Calculate how many spins fit: sum = n*baseDelay + rampUp*n*(n-1)/2 ≈ targetMs
+            // n*80 + 6*n*(n-1) ≈ targetMs → 6n² + 74n ≈ targetMs
+            // Solve quadratic: n = (-74 + sqrt(74² + 4*6*targetMs)) / (2*6)
+            int spins = (int)((-74 + Math.Sqrt(74 * 74 + 24.0 * targetMs)) / 12.0);
+            spins = Math.Clamp(spins, 8, 80);
+
             Random rnd = new Random();
-            int spins = 20;
-            int baseDelay = 150;
             for (int i = 0; i < spins; i++)
             {
                 if (_currentHighlightedSlot != null)
@@ -115,25 +139,30 @@ namespace Gw2Giveaway
                     _currentHighlightedSlot.IsHighlighted = true;
                 }
 
-                int delay = baseDelay + (i * 8);
+                int delay = baseDelay + (i * rampUp);
                 await Task.Delay(delay);
             }
 
             // Final winner highlight (only for items)
             if (!win.IsGold && win.Row >= 0 && win.Col >= 0)
             {
+                if (_currentHighlightedSlot != null)
+                {
+                    _currentHighlightedSlot.IsHighlighted = false;
+                }
+
                 var winningSlot = vm.Slots[win.Row * 10 + win.Col];
                 winningSlot.IsHighlighted = true;
                 _currentHighlightedSlot = winningSlot;
 
-                await Task.Delay(1500);
+                await Task.Delay(500);
 
                 winningSlot.IsHighlighted = false;
                 _currentHighlightedSlot = null;
             }
             else if (win.IsGold && filledSlots.Count > 0)
             {
-                await Task.Delay(300);
+                await Task.Delay(150);
             }
 
             WinnerGrid.Visibility = Visibility.Visible;

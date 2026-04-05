@@ -1,16 +1,20 @@
 ﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
+using Microsoft.Win32;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using Gw2Giveaway.Helpers;
 
 namespace Gw2Giveaway
 {
     public class SlotViewModel : INotifyPropertyChanged
     {
+        private const string CustomPrizePlaceholderImage = "pack://application:,,,/Images/Gold_coin.png";
+
         public PrizeSlot Slot { get; }
         public ICommand EditCommand { get; }          // Select GW2 item
         public ICommand CustomPrizeCommand { get; }   // Set custom prize
@@ -21,8 +25,20 @@ namespace Gw2Giveaway
         public string Description => Slot.Item?.Description ?? "";
         public bool IsGw2Item => Slot.Item != null;
         public ICommand SetPrizeRarityCommand { get; }
-       // public bool ShowPrizeRarityBadges { get; set; } = true;
-        // In constructor
+
+        private bool _showPrizeRarityBadges = true;
+        public bool ShowPrizeRarityBadges
+        {
+            get => _showPrizeRarityBadges;
+            set
+            {
+                if (_showPrizeRarityBadges != value)
+                {
+                    _showPrizeRarityBadges = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
 
         private readonly Action _save;
         private bool _isHighlighted;
@@ -38,10 +54,11 @@ namespace Gw2Giveaway
                 }
             }
         }
-        public SlotViewModel(PrizeSlot slot, Action save)
+        public SlotViewModel(PrizeSlot slot, Action save, bool showRarityBadges = true)
         {
             Slot = slot;
             _save = save;
+            ShowPrizeRarityBadges = showRarityBadges;
 
             EditCommand = new RelayCommand(EditGw2Item);
             CustomPrizeCommand = new RelayCommand(SetCustomPrize);
@@ -76,11 +93,45 @@ namespace Gw2Giveaway
             if (nameDlg.ShowDialog() != true || string.IsNullOrWhiteSpace(nameDlg.Result)) return;
 
             string name = nameDlg.Result.Trim();
+            string? url = null;
 
-            var urlDlg = new InputDialog("Custom icon URL (optional – leave blank for no icon):", Slot.CustomIconUrl ?? "");
-            if (urlDlg.ShowDialog() != true) return;
+            var choiceDialog = new ChoiceDialog(
+                "Custom Prize Image",
+                "Choose icon source:\nYes = Local file\nNo = Online URL\nCancel = No image",
+                "Local File",
+                "Online URL",
+                "No Image");
+            choiceDialog.ShowDialog();
+            var imageSourceChoice = choiceDialog.Result;
 
-            string url = string.IsNullOrWhiteSpace(urlDlg.Result) ? null : urlDlg.Result.Trim();
+            if (imageSourceChoice == MessageBoxResult.Yes)
+            {
+                var picker = new OpenFileDialog
+                {
+                    Title = "Choose custom prize image",
+                    Filter = "Image files|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp|All files|*.*",
+                    CheckFileExists = true,
+                    Multiselect = false
+                };
+
+                if (picker.ShowDialog() == true)
+                {
+                    url = new Uri(picker.FileName, UriKind.Absolute).AbsoluteUri;
+                }
+            }
+            else if (imageSourceChoice == MessageBoxResult.No)
+            {
+                var urlDlg = new InputDialog("Paste image URL (optional, http/https):", Slot.CustomIconUrl ?? "");
+                if (urlDlg.ShowDialog() != true)
+                    return;
+
+                url = NormalizeWebImageUrl(urlDlg.Result);
+                if (!string.IsNullOrWhiteSpace(urlDlg.Result) && string.IsNullOrWhiteSpace(url))
+                {
+                    new InfoDialog("Invalid URL", "Please use a valid http/https image URL.").ShowDialog();
+                    return;
+                }
+            }
 
             // Override any GW2 item
             Slot.Item = null;
@@ -94,6 +145,21 @@ namespace Gw2Giveaway
 
             RaisePropertyChanges();
             _save();
+        }
+
+        private static string? NormalizeWebImageUrl(string? input)
+        {
+            if (string.IsNullOrWhiteSpace(input))
+                return null;
+
+            string value = input.Trim();
+            if (!Uri.TryCreate(value, UriKind.Absolute, out var uri))
+                return null;
+
+            if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+                return null;
+
+            return uri.AbsoluteUri;
         }
         public PrizeRarity PrizeRarity
         {
@@ -147,7 +213,10 @@ namespace Gw2Giveaway
             OnPropertyChanged(nameof(HasPrize));
         }
 
-        public string ImageSource => Slot.CustomIconUrl ?? Slot.Item?.Icon ?? "";
+        public string ImageSource
+            => Slot.CustomIconUrl
+               ?? Slot.Item?.Icon
+               ?? (!string.IsNullOrWhiteSpace(Slot.CustomName) ? CustomPrizePlaceholderImage : "");
         public string StackText => Slot.DisplayStack > 1 ? Slot.DisplayStack.ToString() : "";
         public string ItemName => Slot.CustomName ?? Slot.Item?.Name ?? "Empty Slot";
 
@@ -163,7 +232,21 @@ namespace Gw2Giveaway
     public class BankViewModel : INotifyPropertyChanged
     {
         public ObservableCollection<SlotViewModel> Slots { get; } = new();
-        public bool ShowPrizeRarityBadges { get; set; } = true;
+
+        private bool _showPrizeRarityBadges = true;
+        public bool ShowPrizeRarityBadges
+        {
+            get => _showPrizeRarityBadges;
+            set
+            {
+                if (_showPrizeRarityBadges != value)
+                {
+                    _showPrizeRarityBadges = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
         private long _goldAmount;
         public long GoldAmount
         {
@@ -183,17 +266,18 @@ namespace Gw2Giveaway
         private readonly PrizeBank _bank;
         private readonly Action _save;
 
-        public BankViewModel(PrizeBank bank, Action save)
+        public BankViewModel(PrizeBank bank, Action save, bool showRarityBadges = true)
         {
             _bank = bank;
             _save = save;
+            ShowPrizeRarityBadges = showRarityBadges;
             _goldAmount = bank.GoldAmount;
 
             for (int r = 0; r < 3; r++)
             {
                 for (int c = 0; c < 10; c++)
                 {
-                    Slots.Add(new SlotViewModel(bank.Slots[r, c], _save));
+                    Slots.Add(new SlotViewModel(bank.Slots[r, c], _save, showRarityBadges));
                 }
             }
         }
@@ -204,26 +288,4 @@ namespace Gw2Giveaway
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
     }
-
-    public class RelayCommand : ICommand
-    {
-        private readonly Action _execute;
-        public RelayCommand(Action execute) => _execute = execute;
-
-        public event EventHandler? CanExecuteChanged;
-        public bool CanExecute(object? parameter) => true;
-        public void Execute(object? parameter) => _execute();
     }
-
-    public class RelayCommand<T> : ICommand
-    {
-        private readonly Action<T?> _execute;
-        public RelayCommand(Action<T?> execute) => _execute = execute;
-
-        public event EventHandler? CanExecuteChanged;
-        public bool CanExecute(object? parameter) => true;
-        public void Execute(object? parameter) => _execute((T?)parameter);
-    }
-
-    
-}

@@ -138,4 +138,105 @@ namespace Gw2Giveaway.Converters
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotImplementedException();
     }
+    public class HexToBrushConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is string hexString && !string.IsNullOrWhiteSpace(hexString))
+            {
+                try
+                {
+                    var color = (Color)ColorConverter.ConvertFromString(hexString);
+                    return new SolidColorBrush(color);
+                }
+                catch
+                {
+                    // Invalid hex → fall back to transparent
+                }
+            }
+            return Brushes.Transparent;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is SolidColorBrush brush)
+            {
+                return brush.Color.ToString(); // Returns #AARRGGBB
+            }
+            return "#FF000000";
+        }
+    }
+    public class ColorToHexStringConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is Color color)
+            {
+                return $"#{color.A:X2}{color.R:X2}{color.G:X2}{color.B:X2}";
+            }
+            return "#FF000000"; // Fallback
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is string hex && !string.IsNullOrWhiteSpace(hex))
+            {
+                try
+                {
+                    string clean = hex.TrimStart('#').ToUpperInvariant();
+                    if (clean.Length == 6) clean = "FF" + clean; // Add full opacity if no alpha
+                    if (clean.Length == 8)
+                    {
+                        byte a = System.Convert.ToByte(clean.Substring(0, 2), 16);
+                        byte r = System.Convert.ToByte(clean.Substring(2, 2), 16);
+                        byte g = System.Convert.ToByte(clean.Substring(4, 2), 16);
+                        byte b = System.Convert.ToByte(clean.Substring(6, 2), 16);
+                        return Color.FromArgb(a, r, g, b);
+                    }
+                }
+                catch { }
+            }
+            return Colors.Transparent;
+        }
+    }
+    public class InvertedBoolToVisibilityConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return (bool)value ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+    public class StringToVisibilityConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return string.IsNullOrEmpty(value as string) ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+    public class TimeLeftSecondsConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is string timeStr && int.TryParse(timeStr.Replace("s", ""), out int seconds))
+            {
+                return seconds < 10;
+            }
+            return false;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
 }

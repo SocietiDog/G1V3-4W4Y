@@ -20,5 +20,11 @@
         <conv:PrizeRarityToTextConverter x:Key="PrizeRarityToTextConverter"/>
         <conv:ActionToVisibilityConverter x:Key="ActionToVisibilityConverter"/>
         <conv:PercentageConverter x:Key="PercentageConverter"/>
+        <conv:ColorToHexStringConverter x:Key="ColorToHexConverter"/>
+        <conv:StringToVisibilityConverter x:Key="StringToVisibilityConverter"/>
+        
+        <conv:TimeLeftSecondsConverter x:Key="TimeLeftSecondsConverter"/>
+        <conv:InvertedBoolToVisibilityConverter x:Key="InvertedBoolToVisibilityConverter"/>
+        <conv:HexToBrushConverter x:Key="HexToBrushConverter"/>
     </Application.Resources>
 </Application>

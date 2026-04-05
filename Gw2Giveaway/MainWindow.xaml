@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:Gw2Giveaway"
         xmlns:conv="clr-namespace:Gw2Giveaway.Converters"
-        Title="GW2 Giveaway Tool" Height="900" Width="720"
+        Title="GW2 Giveaway Tool" Height="1050" Width="720"
         AllowsTransparency="True" Background="Transparent" WindowStyle="None" ResizeMode="CanResizeWithGrip">
     <Window.Resources>
         <Style x:Key="BankButton" TargetType="Button">
@@ -150,117 +150,121 @@
                 <TabItem Header="Settings" IsSelected="True" Style="{StaticResource Gw2TabItemStyle}">
                     <StackPanel Margin="20">
 
-                        <StackPanel>
-                        <!-- Database -->
-                        <TextBlock Text="Database Status" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,0,0,10">
-                            <ProgressBar x:Name="DatabaseProgress" 
-                 Width="215" 
+                        <StackPanel Height="539">
+                            <!-- Database -->
+                            <TextBlock Text="Database Status" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,0,0,10">
+                                <ProgressBar x:Name="DatabaseProgress" 
+                 Width="414" 
                  Height="30" 
                  Value="0" 
                  Maximum="100"
                  Margin="0,0,20,0">
-                                <ProgressBar.Style>
-                                    <Style TargetType="ProgressBar">
-                                        <Setter Property="Foreground" Value="Gold"/>
-                                        <Setter Property="Background" Value="#66000000"/>
-                                        <Setter Property="BorderBrush" Value="#FFEFDFDF"/>
-                                        <Setter Property="BorderThickness" Value="2"/>
-                                        <Setter Property="Template">
-                                            <Setter.Value>
-                                                <ControlTemplate TargetType="ProgressBar">
-                                                    <Border Background="{TemplateBinding Background}"
+                                    <ProgressBar.Style>
+                                        <Style TargetType="ProgressBar">
+                                            <Setter Property="Foreground" Value="Gold"/>
+                                            <Setter Property="Background" Value="#66000000"/>
+                                            <Setter Property="BorderBrush" Value="#FFEFDFDF"/>
+                                            <Setter Property="BorderThickness" Value="2"/>
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="ProgressBar">
+                                                        <Border Background="{TemplateBinding Background}"
                                     BorderBrush="{TemplateBinding BorderBrush}"
                                     BorderThickness="{TemplateBinding BorderThickness}"
                                     CornerRadius="15">
-                                                        <Grid>
-                                                            <Rectangle x:Name="PART_Indicator"
+                                                            <Grid>
+                                                                <Rectangle x:Name="PART_Indicator"
                                                HorizontalAlignment="Left"
                                                Fill="{TemplateBinding Foreground}"
                                                RadiusX="15" RadiusY="15"/>
-                                                            <Rectangle x:Name="PART_Track"/>
-                                                        </Grid>
-                                                    </Border>
-                                                </ControlTemplate>
-                                            </Setter.Value>
-                                        </Setter>
-                                    </Style>
-                                </ProgressBar.Style>
-                            </ProgressBar>
+                                                                <Rectangle x:Name="PART_Track"/>
+                                                            </Grid>
+                                                        </Border>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </ProgressBar.Style>
+                                </ProgressBar>
 
-                            <TextBlock x:Name="DatabaseStatus" 
+                                <TextBlock x:Name="DatabaseStatus" 
                Text="Loading..." 
                FontSize="18"
                Foreground="#FFF3F3EA"
                VerticalAlignment="Center"
                Margin="0,0,20,0"/>
 
-                        </StackPanel >
-                        <StackPanel>
-                            <Button Content="Refresh Database" 
+                            </StackPanel >
+                            <StackPanel>
+                                <Button Content="Refresh Database" 
 Click="RefreshDatabase_Click" 
 Style="{StaticResource BankButton}"
 Width="120"
 Height="27"
 FontSize="12" Padding="0,0,0,0" HorizontalAlignment="Left" Margin="8,0,8,8"/>
-                        </StackPanel>
-                        <!-- Twitch Connection -->
-                        <TextBlock Text="Twitch Connection" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
-                        <Grid Margin="0,0,0,20" Width="420" HorizontalAlignment="Left">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition/>
-                                <RowDefinition/>
-                                <RowDefinition/>
-                                <RowDefinition/>
-                            </Grid.RowDefinitions>
-                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Channel:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                            <TextBox Grid.Row="0" Grid.Column="1" x:Name="ChannelText" Margin="5,5,0,5"/>
-                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Bot Name:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                            <TextBox Grid.Row="1" Grid.Column="1" x:Name="BotNameText" Margin="5,5,0,5"/>
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="OAuth:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                            <PasswordBox Grid.Row="2" Grid.Column="1" x:Name="OAuthBox" Margin="5,0,0,60" Grid.RowSpan="2"/>
-                            <StackPanel Grid.Row="3" Grid.Column="1" Margin="0,8,0,10" Orientation="Horizontal">
-                                <Button x:Name="ConnectButton" Content="Connect to Twitch" Click="Connect_Click" Style="{StaticResource BankButton}"  Padding="5,5,5,5" FontSize="12" />
-                                <Button x:Name="DisconnectButton" Content="Disconnect" Click="Disconnect_Click" Style="{StaticResource BankButton}"  Padding="5,5,5,5" FontSize="12" />
-                                <TextBlock x:Name="TwitchStatus" Grid.Row="3" Grid.Column="1"  Text="Not connected" Foreground="Red" FontWeight="Bold" RenderTransformOrigin="0.81,1.698"  VerticalAlignment="Center" Margin="20,0,0,0"/>
                             </StackPanel>
+                            <!-- Twitch Connection -->
+                            <TextBlock Text="Twitch Connection" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
+                            <Grid Margin="0,0,0,20" Width="574" HorizontalAlignment="Left" Height="327">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition/>
+                                    <RowDefinition/>
+                                    <RowDefinition/>
+                                    <RowDefinition/>
+                                    <RowDefinition/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Channel:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <TextBox Grid.Row="0" Grid.Column="1" x:Name="ChannelText" Margin="5,5,0,5" Height="35"/>
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Bot Name:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <TextBox Grid.Row="1" Grid.Column="1" x:Name="BotNameText" Margin="5,5,0,5" Height="35"/>
+                                <TextBlock Text="Broadcaster ID :" Grid.Row="2" Grid.Column="0" Margin="0,24,10,0"/>
+                                <TextBox x:Name="BroadcasterIdText" Text="{Binding BroadcasterId, UpdateSourceTrigger=PropertyChanged}" Grid.Row="2" Grid.Column="1" Margin="5,5,0,5" Height="35"/>
+                                <StackPanel Grid.Row="3" Orientation="Horizontal" Grid.ColumnSpan="2" HorizontalAlignment="Left" Margin="110,5,0,0">
+                                    <Button x:Name="AuthorizeButton" Content="Login with Twitch" Click="AuthWithTwitch_Click" Style="{StaticResource BankButton}" Padding="10,5,10,5" FontSize="12" Margin="5,5,0,5"/>
+                                </StackPanel>
+                                <StackPanel Grid.Row="4" Margin="110,8,-60,10" Orientation="Horizontal" Grid.ColumnSpan="2">
+                                    <Button x:Name="ConnectButton" Content="Connect to Twitch" Click="Connect_Click" Style="{StaticResource BankButton}"  Padding="5,5,5,5" FontSize="12" />
+                                    <Button x:Name="DisconnectButton" Content="Disconnect" Click="Disconnect_Click" Style="{StaticResource BankButton}"  Padding="5,5,5,5" FontSize="12" />
+                                    <TextBlock x:Name="TwitchStatus"   Text="Not connected" Foreground="Red" FontWeight="Bold" RenderTransformOrigin="0.81,1.698" Margin="15,0,0,5" VerticalAlignment="Center"/>
+                                </StackPanel>
 
 
-                        </Grid>
-                    </StackPanel>
+                            </Grid>
+                        </StackPanel>
                     </StackPanel>
                 </TabItem>
                 <TabItem Header="Giveaway" Style="{StaticResource Gw2TabItemStyle}">
                     <StackPanel Margin="20">
-                    <!-- Entry Settings -->
-                    <TextBlock Text="Entry Settings" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
-                    <StackPanel Margin="0,0,0,20">
-                        <ComboBox x:Name="EntryModeCombo" SelectedIndex="0" Width="200" HorizontalAlignment="Left" Foreground="Black">
-                            <ComboBoxItem>!Command</ComboBoxItem>
-                            <ComboBoxItem>All Chatters</ComboBoxItem>
-                        </ComboBox>
-                        <TextBox x:Name="EntryCommandText" Margin="4,5,0,0" ToolTip="Command text (e.g. !enter)" Width="200" HorizontalAlignment="Left"/>
-                    </StackPanel>
-                    <TextBlock Text="Entry Period Control" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
-                    <StackPanel Margin="0,0,0,20">
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                            <TextBlock Text="Entry Time (seconds, 0 = unlimited):" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                            <TextBox x:Name="EntryTimeText" Text="300" Width="100"/>
+                        <!-- Entry Settings -->
+                        <TextBlock Text="Entry Settings" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
+                        <StackPanel Margin="0,0,0,20">
+                            <ComboBox x:Name="EntryModeCombo" SelectedIndex="0" Width="200" HorizontalAlignment="Left" Foreground="Black">
+                                <ComboBoxItem>!Command</ComboBoxItem>
+                                <ComboBoxItem>All Chatters</ComboBoxItem>
+                            </ComboBox>
+                            <TextBox x:Name="EntryCommandText" Margin="4,5,0,0" ToolTip="Command text (e.g. !enter)" Width="200" HorizontalAlignment="Left"/>
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal">
-                            <Button Content="Start Entries" Click="StartEntries_Click" Style="{StaticResource BankButton}" Width="150" Height="40" Margin="0,0,10,0"/>
-                            <Button Content="Stop Entries" Click="StopEntries_Click" Style="{StaticResource BankButton}" Width="150" Height="40"/>
+                        <TextBlock Text="Entry Period Control" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
+                        <StackPanel Margin="0,0,0,20">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                <TextBlock Text="Entry Time (seconds, 0 = unlimited):" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <TextBox x:Name="EntryTimeText" Text="300" Width="100"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="Start Entries" Click="StartEntries_Click" Style="{StaticResource BankButton}" Width="150" Height="40" Margin="0,0,10,0" Padding="5,0,5,0"/>
+                                <Button Content="Stop Entries" Click="StopEntries_Click" Style="{StaticResource BankButton}" Width="150" Height="40" Padding="5,0,5,0"/>
+                            </StackPanel>
+                            <TextBlock x:Name="EntryStatusText" Text="Entries: Closed" FontSize="16" FontWeight="Bold" Foreground="Red" Margin="0,10,0,0"/>
                         </StackPanel>
-                        <TextBlock x:Name="EntryStatusText" Text="Entries: Closed" FontSize="16" FontWeight="Bold" Foreground="Red" Margin="0,10,0,0"/>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,20,0,0">
-                        <TextBox x:Name="TestEntrantsCountText" Text="20" Width="80" Margin="0,0,10,0"/>
-                        <Button Content="Generate Test Entrants" Click="GenerateTestEntrants_Click" Style="{StaticResource BankButton}" Width="200" Height="40"/>
-                    </StackPanel>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,125,20,0" VerticalAlignment="Bottom">
+                            <TextBox x:Name="TestEntrantsCountText" Text="20" Width="80" Margin="0,0,10,0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontSize="28"/>
+                            <Button Content="Generate Test Entrants" Click="GenerateTestEntrants_Click" Style="{StaticResource BankButton}" Width="200" Height="40" Padding="5,0,5,0" VerticalAlignment="Bottom" HorizontalAlignment="Right"/>
+                        </StackPanel>
                     </StackPanel>
                 </TabItem>
                 <TabItem Header="Advanced" Style="{StaticResource Gw2TabItemStyle}">
@@ -297,7 +301,7 @@ FontSize="12" Padding="0,0,0,0" HorizontalAlignment="Left" Margin="8,0,8,8"/>
                 Width="200"
                 Height="40"
                 Margin="0,0,0,10"
-                HorizontalAlignment="Left"/>
+                HorizontalAlignment="Left" Padding="5,0,5,0"/>
 
                         <!-- Add new reward fields -->
                         <Grid Margin="0,0,0,10">
@@ -368,46 +372,92 @@ FontSize="12" Padding="0,0,0,0" HorizontalAlignment="Left" Margin="8,0,8,8"/>
                         </StackPanel>
 
                         <!-- Roll Settings -->
-                        <TextBlock Text="Roll Settings" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10" Width="202" HorizontalAlignment="Left"/>
+                        <TextBlock Text="Giveaway Mode" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
                         <StackPanel Margin="0,0,0,20">
-                            <ComboBox x:Name="RollModeCombo" SelectedIndex="0" Foreground="Black" Width="220" HorizontalAlignment="Left">
-                                <ComboBoxItem>Classic Wheel</ComboBoxItem>
-                                <ComboBoxItem>Bank Animation</ComboBoxItem>
-                                <ComboBoxItem>Bank Random (No Animation)</ComboBoxItem>
+                            <TextBlock Text="Select how you want winners rolled:" VerticalAlignment="Center" Margin="0,0,0,10"/>
+                            <ComboBox x:Name="GiveawayModeCombo" SelectedIndex="2" Foreground="Black" Width="450" HorizontalAlignment="Left" Height="32" SelectionChanged="GiveawayModeCombo_SelectionChanged">
+                                <ComboBoxItem>🏦 Bank Only - Roll directly from prize bank</ComboBoxItem>
+                                <ComboBoxItem>⭐ Prize Only - Slot wheel with single displayed prize</ComboBoxItem>
+                                <ComboBoxItem>🎲 Random Pool - Slot wheel with 50/50 random between bank and prize</ComboBoxItem>
                             </ComboBox>
-                            <CheckBox x:Name="ShowRarityBadgesCheck" Content="Show Prize Rarity Badges in Bank Editor" IsChecked="True"/>
+
+                            <!-- Bank % Slider (only visible for Random Pool mode) -->
+                            <Border x:Name="RandomPoolPanel" Visibility="Collapsed" Margin="0,20,0,0" Background="#AA1a1a2e" Padding="15" CornerRadius="10" BorderBrush="#666633" BorderThickness="2">
+                                <StackPanel>
+                                    <TextBlock Text="Random Pool Settings" FontSize="14" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                        <TextBlock Text="🏦 Bank:" VerticalAlignment="Center" Margin="0,0,15,0" Foreground="#6699FF" FontWeight="Bold"/>
+                                        <TextBlock x:Name="BankPercentageText" Text="50%" Foreground="Gold" FontWeight="Bold" Width="50" FontSize="16"/>
+                                        <Slider x:Name="BankPercentageSlider" Minimum="0" Maximum="100" Value="50" Width="200" HorizontalAlignment="Left" VerticalAlignment="Center"
+                                                TickFrequency="1" IsSnapToTickEnabled="True" TickPlacement="BottomRight"
+                                                ValueChanged="BankPercentageSlider_Changed"/>
+                                        <TextBlock Text="⭐ Prize:" VerticalAlignment="Center" Margin="20,0,0,0" Foreground="#FFDD00" FontWeight="Bold"/>
+                                        <TextBlock x:Name="PrizePercentageText" Text="50%" Foreground="Gold" FontWeight="Bold" Width="50" FontSize="16" Margin="10,0,0,0"/>
+                                    </StackPanel>
+                                    <TextBlock Text="Adjust the odds between Bank and Prize when random mode is selected" FontSize="11" Foreground="Gray"/>
+                                </StackPanel>
+                            </Border>
+
+                            <CheckBox x:Name="ShowRarityBadgesCheck" Content="Show Prize Rarity Badges in Bank Editor" IsChecked="True" Checked="ShowRarityBadgesCheck_Changed" Unchecked="ShowRarityBadgesCheck_Changed" Margin="0,15,0,0"/>
+
+                            <!-- Slot Wheel Duration -->
+                            <Border Background="#33000000" CornerRadius="10" Padding="14,10" Margin="0,15,0,0" BorderBrush="#44FFFFFF" BorderThickness="1">
+                                <StackPanel>
+                                    <TextBlock Text="⏱ Slot Wheel Roll Duration" FontSize="15" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,4"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                        <Slider x:Name="SlotRollDurationSlider" Minimum="3" Maximum="30" Value="12" Width="300"
+                                                TickFrequency="1" IsSnapToTickEnabled="True" TickPlacement="BottomRight"
+                                                ValueChanged="SlotRollDurationSlider_Changed"/>
+                                        <TextBlock x:Name="SlotRollDurationDisplay" Text="12s" FontSize="16" FontWeight="Bold" Foreground="White" Margin="12,0,0,0" VerticalAlignment="Center" MinWidth="35"/>
+                                    </StackPanel>
+                                    <TextBlock Text="How long the slot wheel spins before revealing the winner (3–30 seconds)" FontSize="11" Foreground="Gray" Margin="0,2,0,0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Bank Roll Duration -->
+                            <Border Background="#33000000" CornerRadius="10" Padding="14,10" Margin="0,10,0,0" BorderBrush="#44FFFFFF" BorderThickness="1">
+                                <StackPanel>
+                                    <TextBlock Text="🏦 Bank Prize Pick Duration" FontSize="15" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,4"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                        <Slider x:Name="BankRollDurationSlider" Minimum="2" Maximum="15" Value="5" Width="300"
+                                                TickFrequency="1" IsSnapToTickEnabled="True" TickPlacement="BottomRight"
+                                                ValueChanged="BankRollDurationSlider_Changed"/>
+                                        <TextBlock x:Name="BankRollDurationDisplay" Text="5s" FontSize="16" FontWeight="Bold" Foreground="White" Margin="12,0,0,0" VerticalAlignment="Center" MinWidth="35"/>
+                                    </StackPanel>
+                                    <TextBlock Text="How long the bank highlight bounces between slots before landing (2–15 seconds)" FontSize="11" Foreground="Gray" Margin="0,2,0,0"/>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                     </StackPanel>
                 </TabItem>
                 <TabItem Header="Prize/Entrants" Style="{StaticResource Gw2TabItemStyle}">
-                            <StackPanel Margin="20">
-                                <!-- Classic Prize Setup (for Wheel mode) -->
-                    <TextBlock Text="Classic Prize Setup (used for Wheel mode)" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
-                    <Grid Margin="0,0,0,20">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition/>
-                            <RowDefinition/>
-                            <RowDefinition/>
-                        </Grid.RowDefinitions>
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Prize Name:" VerticalAlignment="Center" Margin="0,0,10,0" Width="170" HorizontalAlignment="Left"/>
-                        <TextBox Grid.Row="0" Grid.Column="1" x:Name="ClassicPrizeNameText" Width="345" HorizontalAlignment="Left"/>
-                        <TextBlock Grid.Row="1" Grid.Column="0" Text="GW2 Item ID or Image URL:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                        <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal">
-                            <TextBox x:Name="ClassicPrizeInputText" Width="200"/>
-                            <Button Content="Fetch/Load" Click="ClassicPrizeFetch_Click" Style="{StaticResource BankButton}"/>
+                    <StackPanel Margin="20">
+                        <TextBlock Text="Classic Prize Pool" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
+                        <TextBlock Text="Classic pool entries (one per line): gold:500 | item:30684|2 | custom:My Prize|https://icon.url|1"
+                                   FontSize="12"
+                                   Foreground="Gray"
+                                   Margin="0,0,0,4"/>
+                        <TextBox x:Name="ClassicPrizePoolText"
+                                 Height="90"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto"
+                                 TextChanged="ClassicPrizePoolText_Changed"
+                                 Margin="0,0,0,16"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                            <Button Content="Add Gold" Click="AddClassicPoolGold_Click" Style="{StaticResource BankButton}" Width="100" Height="34" FontSize="12" Padding="5,0,5,0" Margin="0,0,8,0"/>
+                            <Button Content="Add GW2 Item" Click="AddClassicPoolGw2Item_Click" Style="{StaticResource BankButton}" Width="110" Height="34" FontSize="12" Padding="5,0,5,0" Margin="0,0,8,0"/>
+                            <Button Content="Add Custom" Click="AddClassicPoolCustom_Click" Style="{StaticResource BankButton}" Width="110" Height="34" FontSize="12" Padding="5,0,5,0" Margin="0,0,8,0"/>
+                            <Button Content="Clear Pool" Click="ClearClassicPool_Click" Style="{StaticResource BankButton}" Width="95" Height="34" FontSize="12" Padding="5,0,5,0"/>
                         </StackPanel>
-                        <Button Grid.Row="2" Grid.Column="1" Content="Search GW2 Item" Click="SelectClassicPrizeItem_Click" Style="{StaticResource BankButton}" HorizontalAlignment="Left"/>
-                    </Grid>
-                    <Image x:Name="ClassicPrizePreview" Height="200" Stretch="Uniform" Margin="0,10,0,20"/>
 
-                    <!-- Bank -->
-                    <Button Content="Open Prize Bank Editor" Click="OpenPrizeBank_Click" Style="{StaticResource BankButton}" Width="300" Height="50" FontSize="20"/>
+                        <TextBlock x:Name="ClassicPoolPreviewText" Text="Pool preview" FontSize="16" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,6"/>
+                        <Image x:Name="ClassicPoolPreviewImage" Height="140" Stretch="Uniform" Margin="0,0,0,16"/>
 
-                   
+                        <!-- Bank -->
+                        <Button Content="Open Prize Bank Editor" Click="OpenPrizeBank_Click" Style="{StaticResource BankButton}" Width="300" Height="60" FontSize="20" Padding="5,0,5,0"/>
+
+
 
                     </StackPanel>
                 </TabItem>
@@ -415,8 +465,69 @@ FontSize="12" Padding="0,0,0,0" HorizontalAlignment="Left" Margin="8,0,8,8"/>
                     <StackPanel Margin="20">
                         <!-- Entrants -->
                         <TextBlock Text="Current Entrants" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,20,0,10"/>
-                        <ListBox x:Name="EntrantsList" Height="464" Background="#AA000000" Foreground="White" BorderBrush="#FFEFDFDF"/>
+                        <ListBox x:Name="EntrantsList" Height="464" Background="#AA000000" Foreground="White" BorderBrush="#FFEFDFDF">
+                            <ListBox.ContextMenu>
+                                <ContextMenu Background="#EE1a1a2e" Foreground="#FFF3F3EA" BorderBrush="#FFEFDFDF" BorderThickness="2">
+                                    <MenuItem Header="Add Entrant…" Click="EntrantsContextAdd_Click" Foreground="#FFF3F3EA" FontSize="14"/>
+                                    <Separator Background="#44FFFFFF" Margin="4,2"/>
+                                    <MenuItem Header="Remove Selected" Click="EntrantsContextRemove_Click" Foreground="#FFF3F3EA" FontSize="14"/>
+                                    <MenuItem Header="Remove All" Click="EntrantsContextClear_Click" Foreground="#FFF3F3EA" FontSize="14"/>
+                                </ContextMenu>
+                            </ListBox.ContextMenu>
+                        </ListBox>
                     </StackPanel>
+                </TabItem>
+                <TabItem Header="Trivia-Tron" Style="{StaticResource Gw2TabItemStyle}">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="20">
+                            <TextBlock Text="Trivia-Tron Controls" FontSize="24" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,20"/>
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Twitch Status:" FontSize="18" FontWeight="Bold"/>
+                                    <TextBlock Text="{Binding Trivia.ConnectionStatus}" Foreground="Gold" FontSize="16" Margin="0,0,0,20"/>
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal">
+                                    <CheckBox Content="Trivia-Tron Active (Online/Offline)"
+IsChecked="{Binding Trivia.IsTriviaEnabled}"
+FontSize="16"
+HorizontalAlignment="Center"
+Margin="0,0,0,20"/>
+
+                                    <TextBlock Text="{Binding Trivia.TriviaStatus}"
+ FontSize="16"
+ FontWeight="Bold"
+ Foreground="Gold"
+ HorizontalAlignment="Center"
+ Margin="0,0,0,20"/>
+                                </StackPanel>
+
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                <TextBlock Text="Category:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <ComboBox ItemsSource="{Binding Trivia.Categories}"
+          SelectedItem="{Binding Trivia.SelectedCategory}" 
+                          Width="200" Foreground="Black"/>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                <TextBlock Text="Answer Time (seconds):" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <TextBox Text="{Binding Trivia.AnswerTimeSeconds}" Width="100"/>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                                <Button Content="Start Trivia" Command="{Binding Trivia.StartTriviaCommand}" Style="{StaticResource BankButton}" Width="150" Margin="0,0,10,0" Height="50"/>
+                                <Button Content="Stop Trivia" Command="{Binding Trivia.StopTriviaCommand}" Style="{StaticResource BankButton}" Width="150"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Button Content="Show Trivia Overlay" Click="ShowTriviaOverlay_Click" Style="{StaticResource BankButton}" Width="250" Height="50" FontSize="18"/>
+                                <Button Content="Setting" Click="OpenTriviaSettings_Click" Style="{StaticResource BankButton}" Width="150" Height="50" />
+                            </StackPanel>
+
+                            <TextBlock Text="{Binding Trivia.CurrentQuestion}" FontSize="20" TextWrapping="Wrap" Margin="0,20,0,0"/>
+                            <TextBlock Text="{Binding Trivia.TimeLeft}" FontSize="30" Foreground="Red" FontWeight="Bold" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </ScrollViewer>
                 </TabItem>
             </TabControl>
 

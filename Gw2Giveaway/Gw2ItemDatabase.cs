@@ -1,6 +1,7 @@
 ﻿using System.IO;
 using System.Net.Http;
 using System.Text.Json;
+using Gw2Giveaway.Services;
 
 namespace Gw2Giveaway
 {
@@ -56,7 +57,10 @@ namespace Gw2Giveaway
                         return;
                     }
                 }
-                catch { /* corrupted – redownload */ }
+                catch (Exception ex)
+                {
+                    AppLogger.LogError("Gw2ItemDatabase.ReadCache", ex);
+                }
             }
 
             string idsJson = await client.GetStringAsync("https://api.guildwars2.com/v2/items");
@@ -103,7 +107,10 @@ namespace Gw2Giveaway
                 string cacheJson = JsonSerializer.Serialize(Items);
                 File.WriteAllText(CacheFile, cacheJson);
             }
-            catch { /* ignore */ }
+            catch (Exception ex)
+            {
+                AppLogger.LogError("Gw2ItemDatabase.WriteCache", ex);
+            }
 
             progress?.Report(100);
         }

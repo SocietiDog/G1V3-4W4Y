@@ -42,8 +42,34 @@ WindowStartupLocation="CenterScreen">
             </Setter>
         </Style>
 
-        
-       
+        <!-- Dark themed ContextMenu style -->
+        <Style TargetType="ContextMenu">
+            <Setter Property="Background" Value="#EE1a1a2e"/>
+            <Setter Property="Foreground" Value="#FFF3F3EA"/>
+            <Setter Property="BorderBrush" Value="#FFEFDFDF"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="Padding" Value="4"/>
+            <Setter Property="HasDropShadow" Value="True"/>
+        </Style>
+
+        <Style TargetType="MenuItem">
+            <Setter Property="Foreground" Value="#FFF3F3EA"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Style.Triggers>
+                <Trigger Property="IsHighlighted" Value="True">
+                    <Setter Property="Background" Value="#33FFD700"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style TargetType="Separator">
+            <Setter Property="Background" Value="#44FFFFFF"/>
+            <Setter Property="Margin" Value="4,2"/>
+        </Style>
+
+
     </Window.Resources>
 
     <Border CornerRadius="10" BorderThickness="4" Padding="20" BorderBrush="#FFEFDFDF" MouseLeftButtonDown="Window_MouseLeftButtonDown">

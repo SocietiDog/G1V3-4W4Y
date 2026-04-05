@@ -1,28 +1,24 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
-using System.Windows.Shapes;
 
 namespace Gw2Giveaway
 {
-    public class InputDialog : Window
+    public class InfoDialog : Window
     {
-        public string Result { get; private set; }
-
-        public InputDialog(string prompt, string defaultText = "")
+        public InfoDialog(string title, string message)
         {
-            Title = "Input";
-            Width = 400;
-            Height = 200;
+            Title = title;
+            Width = 460;
+            Height = 220;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
             ResizeMode = ResizeMode.NoResize;
             AllowsTransparency = true;
             WindowStyle = WindowStyle.None;
             Background = Brushes.Transparent;
 
-            // Outer border matching app theme
             Border outer = new Border
             {
                 CornerRadius = new CornerRadius(16),
@@ -39,59 +35,51 @@ namespace Gw2Giveaway
             grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-            TextBlock label = new TextBlock
+            TextBlock header = new TextBlock
             {
-                Text = prompt,
+                Text = title,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFF3F3EA")),
+                FontSize = 20,
+                FontWeight = FontWeights.Bold,
+                Margin = new Thickness(0, 0, 0, 10)
+            };
+
+            TextBlock text = new TextBlock
+            {
+                Text = message,
                 Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFF3F3EA")),
                 FontSize = 15,
-                TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 0, 0, 8)
+                TextWrapping = TextWrapping.Wrap
             };
 
-            TextBox textBox = new TextBox
-            {
-                Text = defaultText,
-                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#AA000000")),
-                Foreground = Brushes.White,
-                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFEFDFDF")),
-                CaretBrush = Brushes.White,
-                FontSize = 15,
-                Padding = new Thickness(8, 6, 8, 6),
-                Margin = new Thickness(0, 4, 0, 4),
-                VerticalContentAlignment = VerticalAlignment.Center
-            };
+            Button ok = ChoiceDialogButtonFactory.Create("OK", isDefault: true);
+            ok.Click += (s, e) => { DialogResult = true; Close(); };
 
             StackPanel buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0) };
-
-            Button ok = CreateThemedButton("OK", true);
-            Button cancel = CreateThemedButton("Cancel", false);
-
-            ok.Click += (s, e) => { Result = textBox.Text; DialogResult = true; Close(); };
-            cancel.Click += (s, e) => { DialogResult = false; Close(); };
-
-            buttons.Children.Add(cancel);
             buttons.Children.Add(ok);
 
-            Grid.SetRow(label, 0);
-            Grid.SetRow(textBox, 1);
-            Grid.SetRow(buttons, 2);
+            StackPanel content = new StackPanel();
+            content.Children.Add(header);
+            content.Children.Add(text);
 
-            grid.Children.Add(label);
-            grid.Children.Add(textBox);
+            Grid.SetRow(content, 0);
+            Grid.SetRow(buttons, 2);
+            grid.Children.Add(content);
             grid.Children.Add(buttons);
 
             outer.Child = grid;
             Content = outer;
-
-            Loaded += (s, e) => { textBox.Focus(); textBox.SelectAll(); };
         }
+    }
 
-        private static Button CreateThemedButton(string text, bool isDefault)
+    internal static class ChoiceDialogButtonFactory
+    {
+        public static Button Create(string text, bool isDefault = false)
         {
             Button btn = new Button
             {
                 Content = text,
-                Width = 90,
+                MinWidth = 90,
                 Height = 36,
                 FontSize = 14,
                 FontWeight = FontWeights.Bold,
@@ -99,8 +87,7 @@ namespace Gw2Giveaway
                 Background = Brushes.Transparent,
                 Cursor = Cursors.Hand,
                 Margin = new Thickness(6, 0, 0, 0),
-                IsDefault = isDefault,
-                IsCancel = !isDefault
+                IsDefault = isDefault
             };
 
             var template = new ControlTemplate(typeof(Button));
