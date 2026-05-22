@@ -5,10 +5,10 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Gw2Giveaway"
                 xmlns:converters="clr-namespace:Gw2Giveaway.Converters"
-        Title="Trivia Tron Overlay" Height="580" Width="500"
+        Title="G1V3 - 4W4Y Trivia-Tron" Height="580" Width="500"
         MinWidth="350" MinHeight="450"
         WindowStyle="None" AllowsTransparency="True" Background="#01000000"
-        ResizeMode="CanResizeWithGrip" >
+        ResizeMode="CanResizeWithGrip" WindowStartupLocation="Manual" >
     <Window.Resources>
         
         <DropShadowEffect x:Key="TitleShadow" Color="#000000" Direction="315" ShadowDepth="3" BlurRadius="10" Opacity="0.9"/>
@@ -84,7 +84,7 @@ Commands:
        HorizontalAlignment="Center"
        TextWrapping="Wrap"
        TextAlignment="Center" Margin="0,0,0,5">
-!ik or !answer A/B/C/D • !gold • !leaderboard • !trivia
+!ik or !answer A/B/C/D • !iq • !leaderboard • !trivia
                         </TextBlock>
                     </StackPanel>
                 </Border>
@@ -131,10 +131,10 @@ Commands:
                                         <Run Text="{Binding Username}"
                                              FontWeight="Bold"/>
                                         <Run Text=" — "/>
-                                        <Run Text="{Binding Gold}"
+                                        <Run Text="{Binding Iq}"
                                              FontWeight="Bold"
                                              Foreground="{Binding DataContext.GoldColor, ElementName=RootElement, Converter={StaticResource HexToBrushConverter}}"/>
-                                        <Run Text=" Gold"/>
+                                        <Run Text=" IQ"/>
                                     </TextBlock>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
@@ -158,7 +158,7 @@ Commands:
                             • <Run FontWeight="Bold" Foreground="{Binding AccentColor, Converter={StaticResource HexToBrushConverter}}">!ik or !answer A/B/C/D</Run> — Your answer
                         </TextBlock>
                         <TextBlock FontSize="20" Foreground="{Binding TextColor, Converter={StaticResource HexToBrushConverter}}" TextWrapping="Wrap" Margin="0,0,0,10">
-                            • <Run FontWeight="Bold" Foreground="{Binding AccentColor, Converter={StaticResource HexToBrushConverter}}">!gold</Run> — Check your current Gold balance
+                            • <Run FontWeight="Bold" Foreground="{Binding AccentColor, Converter={StaticResource HexToBrushConverter}}">!iq</Run> — Check your current IQ balance
                         </TextBlock>
                         <TextBlock FontSize="20" Foreground="{Binding TextColor, Converter={StaticResource HexToBrushConverter}}" TextWrapping="Wrap" Margin="0,0,0,10">
                             • <Run FontWeight="Bold" Foreground="{Binding AccentColor, Converter={StaticResource HexToBrushConverter}}">!leaderboard</Run> or <Run FontWeight="Bold" Foreground="{Binding AccentColor, Converter={StaticResource HexToBrushConverter}}">!top</Run> — Show top 5

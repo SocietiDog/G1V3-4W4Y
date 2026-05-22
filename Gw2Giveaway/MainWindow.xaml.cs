@@ -1,9 +1,11 @@
 ﻿using Gw2Giveaway.Services;
+using Microsoft.Win32;
 using Newtonsoft.Json;
 using System;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -40,6 +42,52 @@ namespace Gw2Giveaway
         private BankWindow? _bankWindow;
         private TriviaOverlayWindow? _triviaOverlay;
 
+        private const string ShowOverlayButtonText = "Show Overlay";
+        private const string HideOverlayButtonText = "Hide Overlay";
+        private const string ShowTriviaOverlayButtonText = "Show Trivia Overlay";
+        private const string HideTriviaOverlayButtonText = "Hide Trivia Overlay";
+        private const string OpenPrizeBankButtonText = "Open Prize Bank Editor";
+        private const string ClosePrizeBankButtonText = "Close Prize Bank Editor";
+
+        private static bool IsValidWindowBounds(double? left, double? top, double? width, double? height)
+            => left.HasValue && top.HasValue && width.HasValue && height.HasValue
+               && !double.IsNaN(left.Value) && !double.IsInfinity(left.Value)
+               && !double.IsNaN(top.Value) && !double.IsInfinity(top.Value)
+               && !double.IsNaN(width.Value) && !double.IsInfinity(width.Value) && width.Value > 0
+               && !double.IsNaN(height.Value) && !double.IsInfinity(height.Value) && height.Value > 0;
+
+        private static void ApplySavedWindowBounds(Window window, double? left, double? top, double? width, double? height)
+        {
+            if (!IsValidWindowBounds(left, top, width, height))
+                return;
+
+            window.Left = left!.Value;
+            window.Top = top!.Value;
+            window.Width = width!.Value;
+            window.Height = height!.Value;
+        }
+
+        private static bool TryCaptureWindowBounds(Window window, out double left, out double top, out double width, out double height)
+        {
+            Rect sourceBounds;
+
+            if (window.WindowState == WindowState.Normal)
+            {
+                sourceBounds = new Rect(window.Left, window.Top, window.Width, window.Height);
+            }
+            else
+            {
+                sourceBounds = window.RestoreBounds;
+            }
+
+            left = sourceBounds.Left;
+            top = sourceBounds.Top;
+            width = sourceBounds.Width;
+            height = sourceBounds.Height;
+
+            return IsValidWindowBounds(left, top, width, height);
+        }
+
         private bool _entriesOpen = false;
         private DispatcherTimer _entryTimer = new();
         private int _entryTimeSeconds = 300;
@@ -51,20 +99,51 @@ namespace Gw2Giveaway
         private const string DefaultTwitchClientId = "dlql0djuoozvkc81epya43ilibu19e";
         private const string TwitchOAuthRedirectUri = "http://localhost:54827/callback/";
         private const string TwitchOAuthScopes = "chat:read chat:edit channel:read:redemptions";
+        private const int CurrentDisclaimerVersion = 1;
+
+        private static readonly string DisclaimerText = """
+            Important Disclaimer
+
+            Gw2Giveaway is a community helper tool for streamers running giveaways.
+
+            - Giveaway prizes are provided by the streamer/host, not by this application.
+            - You are solely responsible for your own giveaways, prizes, chat rules, and outcomes.
+            - The app is provided "as is" with no warranties, guarantees, or legal advice.
+            - The developer is not liable for lost items, missed rewards, user disputes, account actions, bans, data loss, hardware issues, or other damages.
+            - Use of this app is at your own risk, including any impact on your PC, operating system, software, or network.
+            - You are responsible for legal compliance, including giveaway laws, age restrictions, taxes, and regional requirements.
+            - The app does not guarantee uptime, uninterrupted operation, fairness outcomes, or successful prize delivery.
+            - You must follow Twitch Terms of Service and all applicable platform/game rules.
+            - You are responsible for how participant/user data is collected, stored, and handled.
+            - This project is not affiliated with, endorsed by, or sponsored by ArenaNet, Guild Wars 2, or Twitch.
+            """;
 
         private static readonly string DataFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data");
         private static readonly string BankFile = Path.Combine(DataFolder, "prizebank.json");
         private static readonly string SettingsFile = Path.Combine(DataFolder, "settings.json");
+        private static readonly string ViewersDbFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "viewers.db");
 
         private AppSettings _settings = new();
         private string _oauthAccessToken = string.Empty;
 
         private ObservableCollection<ChannelPointReward> _channelPointRewards = new();
         public ObservableCollection<ChannelPointReward> ChannelPointRewards => _channelPointRewards;
+
+        private readonly DatabaseService _databaseService = new();
+
+        private ObservableCollection<GiveawayHistoryEntry> _giveawayHistory = new();
+
+        private sealed class TriviaViewerRow
+        {
+            public string Username { get; set; } = string.Empty;
+            public long Iq { get; set; }
+        }
+
         public MainWindow()
         {
             Instance = this;
             InitializeComponent();
+            Loaded += MainWindow_Loaded;
 
             try
             {
@@ -85,6 +164,9 @@ namespace Gw2Giveaway
                     _settings = new AppSettings();
                 }
 
+                SetChannelPointsAvailability(null);
+                _ = CheckAndApplyChannelPointsAvailabilityAsync(_oauthAccessToken, _settings.TwitchClientId, BroadcasterIdText.Text.Trim());
+
                 // Permanent event hooks (only once)
                 _twitch.OnMessageReceived += Twitch_OnMessageReceived;
 
@@ -97,7 +179,7 @@ namespace Gw2Giveaway
                         ConnectButton.IsEnabled = false;
                         DisconnectButton.IsEnabled = true;
 
-                        await _twitch.SendMessageAsync("Giveaway bot is online.");
+                        await _twitch.SendMessageAsync("G1V3 - 4W4Y bot is online.");
 
                         // Connect EventSub for channel points
                         string broadcasterId = BroadcasterIdText.Text.Trim();
@@ -115,7 +197,7 @@ namespace Gw2Giveaway
                     {
                         TwitchStatus.Text = "Connection failed";
                         TwitchStatus.Foreground = Brushes.Red;
-                        MessageBox.Show($"Twitch connection failed: {error}");
+                        DialogService.ShowInfo($"Twitch connection failed: {error}");
                         ConnectButton.IsEnabled = true;
                         DisconnectButton.IsEnabled = false;
 
@@ -127,6 +209,9 @@ namespace Gw2Giveaway
                 {
                     Dispatcher.Invoke(async () =>
                     {
+                        username = username.Trim().ToLowerInvariant();
+                        title = title.Trim();
+
                         if (title.Contains("Trivia", StringComparison.OrdinalIgnoreCase))
                         {
                             if (Trivia.IsTriviaEnabled && !Trivia.IsTriviaPaused)
@@ -136,14 +221,30 @@ namespace Gw2Giveaway
                             }
                         }
 
-                        if (string.IsNullOrWhiteSpace(_settings.TwitchOAuth) && !string.IsNullOrWhiteSpace(_settings.LegacyTwitchOAuth))
-                        {
-                            _settings.TwitchOAuth = _settings.LegacyTwitchOAuth;
-                        }
+                        var reward = _channelPointRewards.FirstOrDefault(r =>
+                            !string.IsNullOrWhiteSpace(r.Title) &&
+                            string.Equals(r.Title.Trim(), title, StringComparison.OrdinalIgnoreCase));
 
-                        if (string.IsNullOrWhiteSpace(_settings.TwitchClientId))
+                        if (reward == null)
+                            return;
+
+                        switch (reward.Action)
                         {
-                            _settings.TwitchClientId = Environment.GetEnvironmentVariable("TWITCH_CLIENT_ID") ?? string.Empty;
+                            case ChannelPointAction.AddToEntrants:
+                                AddEntrant(username);
+                                await _twitch.SendMessageAsync($"@{username} redeemed {reward.Title} and joined the giveaway!");
+                                break;
+
+                            case ChannelPointAction.InstantBankRoll:
+                                InstantBankRollForUser(username);
+                                break;
+
+                            case ChannelPointAction.InstantGoldWin:
+                                if (reward.InstantGoldAmount > 0)
+                                {
+                                    await _twitch.SendMessageAsync($"@{username} redeemed {reward.Title} and won {reward.InstantGoldAmount} Gold!");
+                                }
+                                break;
                         }
                     });
                 };
@@ -151,6 +252,7 @@ namespace Gw2Giveaway
                 DataContext = this;
 
                 _ = LoadDatabaseWithProgress();
+                _ = RefreshDataManagementViewAsync();
 
                 if (_settings.AutoOpenOverlay)
                     ShowTriviaOverlay();
@@ -158,9 +260,37 @@ namespace Gw2Giveaway
             catch (Exception ex)
             {
                 AppLogger.LogError("MainWindow.Constructor", ex);
-                MessageBox.Show($"Startup error: {ex.Message}", "Gw2Giveaway", MessageBoxButton.OK, MessageBoxImage.Error);
+                DialogService.ShowInfo($"Startup error: {ex.Message}", "Gw2Giveaway");
                 DataContext = this;
             }
+        }
+
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (EnsureDisclaimerAccepted())
+                return;
+
+            Application.Current.Shutdown();
+        }
+
+        private bool EnsureDisclaimerAccepted()
+        {
+            if (_settings.DisclaimerAccepted && _settings.DisclaimerAcceptedVersion >= CurrentDisclaimerVersion)
+                return true;
+
+            var dialog = new DisclaimerDialog("Disclaimer & Terms", DisclaimerText, requireAcceptance: true);
+            dialog.ShowDialog();
+
+            if (!dialog.Accepted)
+            {
+                DialogService.ShowInfo("You must accept the disclaimer to use Gw2Giveaway.", "Disclaimer Required");
+                return false;
+            }
+
+            _settings.DisclaimerAccepted = true;
+            _settings.DisclaimerAcceptedVersion = CurrentDisclaimerVersion;
+            PersistSettings();
+            return true;
         }
 
         private void LoadSettings()
@@ -195,6 +325,9 @@ namespace Gw2Giveaway
 
             _settings.TwitchClientId = DefaultTwitchClientId;
 
+            if (string.IsNullOrWhiteSpace(_settings.TwitchBotName))
+                _settings.TwitchBotName = "G1V3 - 4W4Y";
+
             _channelPointRewards = _settings.ChannelPointRewards != null
                 ? new ObservableCollection<ChannelPointReward>(_settings.ChannelPointRewards.Where(r => r != null).Select(r => new ChannelPointReward
                 {
@@ -204,6 +337,12 @@ namespace Gw2Giveaway
                     InstantGoldAmount = r.InstantGoldAmount
                 }))
                 : new ObservableCollection<ChannelPointReward>();
+
+            _giveawayHistory = _settings.GiveawayHistory != null
+                ? new ObservableCollection<GiveawayHistoryEntry>(_settings.GiveawayHistory
+                    .Where(h => h != null)
+                    .OrderByDescending(h => h.TimestampUtc))
+                : new ObservableCollection<GiveawayHistoryEntry>();
 
             // Giveaway settings
             ChannelText.Text = _settings.TwitchChannel;
@@ -280,7 +419,8 @@ namespace Gw2Giveaway
                 _settings.ClassicPrizeName = firstClassicEntry.Name;
                 _settings.ClassicPrizeIconUrl = firstClassicEntry.IconUrl;
             }
-            _settings.ClassicUsePrizePool = !string.IsNullOrWhiteSpace(_settings.ClassicPrizePool);
+            _settings.ClassicUsePrizePool = !string.IsNullOrWhiteSpace(_settings.ClassicPrizePool)
+                || !string.IsNullOrWhiteSpace(_settings.ClassicPrizeName);
             _settings.ChannelPointRewards = new ObservableCollection<ChannelPointReward>(_channelPointRewards.Select(r => new ChannelPointReward
             {
                 Title = r.Title,
@@ -288,6 +428,17 @@ namespace Gw2Giveaway
                 Action = r.Action,
                 InstantGoldAmount = r.InstantGoldAmount
             }));
+            _settings.GiveawayHistory = new ObservableCollection<GiveawayHistoryEntry>(_giveawayHistory
+                .OrderByDescending(h => h.TimestampUtc)
+                .Take(1000)
+                .Select(h => new GiveawayHistoryEntry
+                {
+                    TimestampUtc = h.TimestampUtc,
+                    Winner = h.Winner,
+                    Prize = h.Prize,
+                    Amount = h.Amount,
+                    Source = h.Source
+                }));
 
             // Giveaway mode settings
             _settings.CurrentGiveawayMode = (GiveawayMode)GiveawayModeCombo.SelectedIndex;
@@ -307,17 +458,23 @@ namespace Gw2Giveaway
             _settings.LaterCorrectReward = Trivia.LaterCorrectReward;
 
             _overlay?.UpdateEntryInstruction(EntryCommandText.Text);
+            UpdateOverlayToggleButtons();
 
             try
             {
-                string json = JsonConvert.SerializeObject(_settings, Formatting.Indented);
-                Directory.CreateDirectory(DataFolder);
-                File.WriteAllText(SettingsFile, json);
+                PersistSettings();
             }
             catch (Exception ex)
             {
                 AppLogger.LogError("SaveSettings.WriteFile", ex);
             }
+        }
+
+        private void PersistSettings()
+        {
+            string json = JsonConvert.SerializeObject(_settings, Formatting.Indented);
+            Directory.CreateDirectory(DataFolder);
+            File.WriteAllText(SettingsFile, json);
         }
         private void ShowTriviaOverlay_Click(object sender, RoutedEventArgs e) => ShowTriviaOverlay();
 
@@ -326,13 +483,30 @@ namespace Gw2Giveaway
             if (_triviaOverlay == null)
             {
                 _triviaOverlay = new TriviaOverlayWindow(Trivia);
-                _triviaOverlay.Closed += (s, e) => _triviaOverlay = null;
+                ApplySavedWindowBounds(_triviaOverlay, _settings.TriviaOverlayLeft, _settings.TriviaOverlayTop, _settings.TriviaOverlayWidth, _settings.TriviaOverlayHeight);
+                _triviaOverlay.IsVisibleChanged += TriviaOverlay_IsVisibleChanged;
+                _triviaOverlay.Closed += (s, e) =>
+                {
+                    if (TryCaptureWindowBounds(_triviaOverlay, out var left, out var top, out var width, out var height))
+                    {
+                        _settings.TriviaOverlayLeft = left;
+                        _settings.TriviaOverlayTop = top;
+                        _settings.TriviaOverlayWidth = width;
+                        _settings.TriviaOverlayHeight = height;
+                        PersistSettings();
+                    }
+
+                    _triviaOverlay = null;
+                    UpdateOverlayToggleButtons();
+                };
             }
 
             if (_triviaOverlay.IsVisible)
-                _triviaOverlay.Hide();
+                _triviaOverlay.Close();
             else
                 _triviaOverlay.Show();
+
+            UpdateOverlayToggleButtons();
         }
        
         private void OpenTriviaSettings_Click(object sender, RoutedEventArgs e)
@@ -366,6 +540,8 @@ namespace Gw2Giveaway
                 {
                     DatabaseProgress.Value = 100;
                     DatabaseStatus.Text = $"Ready ({Gw2ItemDatabase.Items.Count:N0} items)";
+                    UpdateClassicPoolPreviewUi();
+                    UpdateOverlayClassicPrizePreview();
                 });
             }
             catch (Exception ex)
@@ -375,7 +551,7 @@ namespace Gw2Giveaway
                 {
                     DatabaseProgress.Value = 0;
                     DatabaseStatus.Text = "Load failed";
-                    MessageBox.Show("Database error: " + ex.Message + "\nCheck internet connection.");
+                    DialogService.ShowInfo("Database error: " + ex.Message + "\nCheck internet connection.");
                 });
             }
         }
@@ -383,6 +559,12 @@ namespace Gw2Giveaway
         private async void RefreshDatabase_Click(object sender, RoutedEventArgs e)
         {
             await LoadDatabaseWithProgress(true);
+        }
+
+        private void ViewDisclaimer_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new DisclaimerDialog("Disclaimer & Terms", DisclaimerText, requireAcceptance: false);
+            dialog.ShowDialog();
         }
 
         private void LoadBankFromFile()
@@ -415,7 +597,7 @@ namespace Gw2Giveaway
             catch (Exception ex)
             {
                 AppLogger.LogError("LoadBankFromFile", ex);
-                MessageBox.Show("Failed to load prize bank – starting with fresh empty bank.\n" + ex.Message);
+                DialogService.ShowInfo("Failed to load prize bank – starting with fresh empty bank.\n" + ex.Message);
                 Bank = new PrizeBank();
             }
 
@@ -434,7 +616,7 @@ namespace Gw2Giveaway
             catch (Exception ex)
             {
                 AppLogger.LogError("SaveBank", ex);
-                MessageBox.Show("Save failed: " + ex.Message + "\nPath: " + BankFile);
+                DialogService.ShowInfo("Save failed: " + ex.Message + "\nPath: " + BankFile);
             }
         }
 
@@ -481,7 +663,7 @@ namespace Gw2Giveaway
             string clientId = ResolveTwitchClientId();
             if (string.IsNullOrWhiteSpace(clientId))
             {
-                MessageBox.Show("Twitch login is not configured yet. Set TWITCH_CLIENT_ID (or save TwitchClientId in settings.json), then click Login with Twitch.");
+                DialogService.ShowInfo("Twitch login is not configured yet. Set TWITCH_CLIENT_ID (or save TwitchClientId in settings.json), then click Login with Twitch.");
                 return;
             }
 
@@ -509,6 +691,8 @@ namespace Gw2Giveaway
 
                 SaveSettings();
 
+                await CheckAndApplyChannelPointsAvailabilityAsync(token.AccessToken, _settings.TwitchClientId, BroadcasterIdText.Text.Trim());
+
                 TwitchStatus.Text = "Authorized";
                 TwitchStatus.Foreground = Brushes.LimeGreen;
             }
@@ -517,7 +701,7 @@ namespace Gw2Giveaway
                 AppLogger.LogError("AuthWithTwitch_Click", ex);
                 TwitchStatus.Text = "Authorization failed";
                 TwitchStatus.Foreground = Brushes.Red;
-                MessageBox.Show($"Twitch authorization failed: {ex.Message}");
+                DialogService.ShowInfo($"Twitch authorization failed: {ex.Message}");
             }
             finally
             {
@@ -674,15 +858,76 @@ namespace Gw2Giveaway
             return (login.ToLowerInvariant(), userId);
         }
 
+        private async Task CheckAndApplyChannelPointsAvailabilityAsync(string accessToken, string clientId, string broadcasterId)
+        {
+            if (string.IsNullOrWhiteSpace(accessToken) || string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(broadcasterId))
+            {
+                SetChannelPointsAvailability(null);
+                return;
+            }
+
+            string? broadcasterType = await GetBroadcasterTypeAsync(accessToken, clientId, broadcasterId);
+            SetChannelPointsAvailability(broadcasterType);
+        }
+
+        private async Task<string?> GetBroadcasterTypeAsync(string accessToken, string clientId, string broadcasterId)
+        {
+            try
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.twitch.tv/helix/users?id={Uri.EscapeDataString(broadcasterId)}");
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+                request.Headers.Add("Client-Id", clientId);
+
+                using HttpResponseMessage response = await _httpClient.SendAsync(request);
+                if (!response.IsSuccessStatusCode)
+                    return null;
+
+                string body = await response.Content.ReadAsStringAsync();
+                using JsonDocument doc = JsonDocument.Parse(body);
+
+                if (!doc.RootElement.TryGetProperty("data", out JsonElement dataEl) || dataEl.ValueKind != JsonValueKind.Array || dataEl.GetArrayLength() == 0)
+                    return null;
+
+                var userEl = dataEl[0];
+                if (!userEl.TryGetProperty("broadcaster_type", out JsonElement typeEl))
+                    return null;
+
+                return typeEl.GetString()?.Trim().ToLowerInvariant();
+            }
+            catch (Exception ex)
+            {
+                AppLogger.LogError("GetBroadcasterTypeAsync", ex);
+                return null;
+            }
+        }
+
+        private void SetChannelPointsAvailability(string? broadcasterType)
+        {
+            if (ChannelPointsControlsPanel == null || ChannelPointsAvailabilityText == null)
+                return;
+
+            bool eligible = string.Equals(broadcasterType, "affiliate", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(broadcasterType, "partner", StringComparison.OrdinalIgnoreCase);
+
+            ChannelPointsControlsPanel.IsEnabled = eligible;
+            ChannelPointsControlsPanel.Opacity = eligible ? 1.0 : 0.45;
+
+            ChannelPointsAvailabilityText.Text = eligible
+                ? "Channel points are available on this channel (Affiliate/Partner detected)."
+                : "Channel points are disabled. Twitch requires Affiliate or Partner status.";
+            ChannelPointsAvailabilityText.Foreground = eligible ? Brushes.LimeGreen : Brushes.Orange;
+        }
+
         private async void Connect_Click(object sender, RoutedEventArgs e)
         {
             SaveSettings();
+            await CheckAndApplyChannelPointsAvailabilityAsync(_oauthAccessToken, _settings.TwitchClientId, BroadcasterIdText.Text.Trim());
 
             if (string.IsNullOrWhiteSpace(ChannelText.Text) ||
                 string.IsNullOrWhiteSpace(_oauthAccessToken) ||
                 string.IsNullOrWhiteSpace(BroadcasterIdText.Text))
             {
-                MessageBox.Show("Please fill in Channel and Broadcaster ID, then click Login with Twitch.");
+                DialogService.ShowInfo("Please fill in Channel and Broadcaster ID, then click Login with Twitch.");
                 return;
             }
 
@@ -691,8 +936,13 @@ namespace Gw2Giveaway
 
             try
             {
+                var oauthProfile = await GetTwitchProfileAsync(_oauthAccessToken);
+                string oauthLogin = oauthProfile?.Login ?? string.Empty;
+
                 _twitch.Channel = ChannelText.Text.Trim().ToLower();
-                _twitch.BotName = BotNameText.Text.Trim().ToLower();
+                _twitch.BotName = !string.IsNullOrWhiteSpace(oauthLogin)
+                    ? oauthLogin
+                    : _twitch.Channel;
                 _twitch.OAuth = _oauthAccessToken;
                 _twitch.EntryMode = _settings.EntryType;
                 _twitch.EntryCommand = _settings.EntryCommand;
@@ -714,7 +964,7 @@ namespace Gw2Giveaway
                 AppLogger.LogError("Connect_Click", ex);
                 TwitchStatus.Text = "Error";
                 TwitchStatus.Foreground = Brushes.Red;
-                MessageBox.Show($"Error: {ex.Message}");
+                DialogService.ShowInfo($"Error: {ex.Message}");
             }
         }
 
@@ -761,7 +1011,7 @@ namespace Gw2Giveaway
         private void EntrantsContextClear_Click(object sender, RoutedEventArgs e)
         {
             if (Entrants.Count == 0) return;
-            var result = MessageBox.Show("Remove all entrants?", "Confirm", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            var result = DialogService.ShowConfirm("Remove all entrants?", "Confirm", yesText: "Yes", noText: "No", cancelText: "Cancel");
             if (result == MessageBoxResult.Yes)
                 Entrants.Clear();
         }
@@ -838,7 +1088,7 @@ namespace Gw2Giveaway
             if (string.IsNullOrWhiteSpace(ClassicPrizePoolText.Text))
                 return;
 
-            var result = MessageBox.Show("Clear all classic pool entries?", "Confirm", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            var result = DialogService.ShowConfirm("Clear all classic pool entries?", "Confirm", yesText: "Yes", noText: "No", cancelText: "Cancel");
             if (result == MessageBoxResult.Yes)
             {
                 ClassicPrizePoolText.Text = string.Empty;
@@ -855,6 +1105,8 @@ namespace Gw2Giveaway
         private void ClassicPrizePoolText_Changed(object sender, System.Windows.Controls.TextChangedEventArgs e)
         {
             UpdateClassicPoolPreviewUi();
+            if (IsLoaded)
+                SaveSettings();
         }
 
         private void UpdateClassicPoolPreviewUi()
@@ -879,14 +1131,45 @@ namespace Gw2Giveaway
         private void ShowOverlay_Click(object sender, RoutedEventArgs e)
         {
             SaveSettings();
-            EnsureOverlayReady(showOverlay: true);
-            _overlay.Show();
-            _overlay.Activate();
+            EnsureOverlayReady(showOverlay: false);
+
+            if (_overlay == null)
+                return;
+
+            if (_overlay.IsVisible)
+                _overlay.Close();
+            else
+            {
+                _overlay.Show();
+                _overlay.Activate();
+            }
+
+            UpdateOverlayToggleButtons();
         }
 
         private void EnsureOverlayReady(bool showOverlay)
         {
-            _overlay ??= new OverlayWindow();
+            if (_overlay == null)
+            {
+                _overlay = new OverlayWindow();
+                ApplySavedWindowBounds(_overlay, _settings.OverlayLeft, _settings.OverlayTop, _settings.OverlayWidth, _settings.OverlayHeight);
+                _overlay.IsVisibleChanged += Overlay_IsVisibleChanged;
+                _overlay.Closed += (s, e) =>
+                {
+                    if (TryCaptureWindowBounds(_overlay, out var left, out var top, out var width, out var height))
+                    {
+                        _settings.OverlayLeft = left;
+                        _settings.OverlayTop = top;
+                        _settings.OverlayWidth = width;
+                        _settings.OverlayHeight = height;
+                        PersistSettings();
+                    }
+
+                    _overlay = null;
+                    UpdateOverlayToggleButtons();
+                };
+            }
+
             ConfigureOverlayCallbacks();
             UpdateOverlayClassicPrizePreview();
             _overlay.UpdateEntryInstruction(_settings.EntryCommand);
@@ -895,6 +1178,30 @@ namespace Gw2Giveaway
             {
                 _overlay.Show();
             }
+
+            UpdateOverlayToggleButtons();
+        }
+
+        private void Overlay_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            UpdateOverlayToggleButtons();
+        }
+
+        private void TriviaOverlay_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            UpdateOverlayToggleButtons();
+        }
+
+        private void UpdateOverlayToggleButtons()
+        {
+            if (ShowOverlayButton != null)
+                ShowOverlayButton.Content = (_overlay?.IsVisible == true) ? HideOverlayButtonText : ShowOverlayButtonText;
+
+            if (ShowTriviaOverlayButton != null)
+                ShowTriviaOverlayButton.Content = (_triviaOverlay?.IsVisible == true) ? HideTriviaOverlayButtonText : ShowTriviaOverlayButtonText;
+
+            if (OpenPrizeBankButton != null)
+                OpenPrizeBankButton.Content = (_bankWindow?.IsVisible == true) ? ClosePrizeBankButtonText : OpenPrizeBankButtonText;
         }
 
         private void UpdateOverlayClassicPrizePreview()
@@ -902,7 +1209,7 @@ namespace Gw2Giveaway
             if (_overlay == null)
                 return;
 
-            var poolEntries = ParseClassicPrizePoolEntries(_settings.ClassicPrizePool);
+            var poolEntries = GetClassicPrizePoolEntriesForRoll();
             if (poolEntries.Count > 0)
             {
                 var first = poolEntries[0];
@@ -922,6 +1229,23 @@ namespace Gw2Giveaway
             _overlay.UpdatePrize("Prize", string.Empty);
         }
 
+        private List<ClassicPrizePoolEntry> GetClassicPrizePoolEntriesForRoll()
+        {
+            var poolEntries = ParseClassicPrizePoolEntries(_settings.ClassicPrizePool);
+            if (poolEntries.Count > 0)
+                return poolEntries;
+
+            if (_settings.ClassicUsePrizePool && !string.IsNullOrWhiteSpace(_settings.ClassicPrizeName))
+            {
+                return new List<ClassicPrizePoolEntry>
+                {
+                    new(_settings.ClassicPrizeName.Trim(), _settings.ClassicPrizeIconUrl ?? string.Empty, 1)
+                };
+            }
+
+            return poolEntries;
+        }
+
         private void ConfigureOverlayCallbacks()
         {
             if (_overlay == null)
@@ -939,7 +1263,7 @@ namespace Gw2Giveaway
         {
             if (!int.TryParse(TestEntrantsCountText.Text, out int count) || count <= 0)
             {
-                MessageBox.Show("Enter a valid number > 0");
+                DialogService.ShowInfo("Enter a valid number > 0");
                 return;
             }
 
@@ -947,21 +1271,31 @@ namespace Gw2Giveaway
             string[] prefixes = { "Viewer", "Gamer", "Twitch", "Stream", "Chat", "Hype", "Legend", "Pro", "Noob", "Boss" };
             string[] suffixes = { "123", "XYZ", "King", "Queen", "Cat", "Dog", "Ninja", "Wizard", "Dragon", "Phoenix" };
 
-            for (int i = 0; i < count; i++)
+            var existing = new HashSet<string>(Entrants, StringComparer.OrdinalIgnoreCase);
+            int added = 0;
+            int attempts = 0;
+            int maxAttempts = Math.Max(count * 20, 2000);
+
+            while (added < count && attempts < maxAttempts)
             {
-                string username = prefixes[rnd.Next(prefixes.Length)] + suffixes[rnd.Next(suffixes.Length)] + rnd.Next(1000);
-                if (!Entrants.Contains(username))
+                string username = prefixes[rnd.Next(prefixes.Length)] + suffixes[rnd.Next(suffixes.Length)] + rnd.Next(1_000_000);
+                attempts++;
+
+                if (existing.Add(username))
+                {
                     Entrants.Add(username);
+                    added++;
+                }
             }
 
-            MessageBox.Show($"Added {count} random test entrants!");
+            DialogService.ShowInfo($"Added {added} random test entrants!");
         }
 
         private void StartRoll_Click(object sender, RoutedEventArgs e)
         {
             if (Entrants.Count == 0)
             {
-                MessageBox.Show("No entrants yet!");
+                DialogService.ShowInfo("No entrants yet!");
                 return;
             }
 
@@ -988,7 +1322,7 @@ namespace Gw2Giveaway
             string iconUrl;
             long prizeAmount;
             List<ClassicPrizePoolEntry>? selectedPoolEntries = null;
-            var poolEntriesForRoll = ParseClassicPrizePoolEntries(_settings.ClassicPrizePool);
+            var poolEntriesForRoll = GetClassicPrizePoolEntriesForRoll();
 
             if (poolEntriesForRoll.Count > 0)
             {
@@ -1034,12 +1368,19 @@ namespace Gw2Giveaway
 
                         string chatMsgBundle = $"@{selectedWinner} won a prize bundle: {summary}! Congratulations!";
                         _twitch?.SendMessageAsync(chatMsgBundle);
+
+                        string bundlePrize = selectedPoolEntries.Count == 1
+                            ? selectedPoolEntries[0].Name
+                            : $"Prize Bundle ({selectedPoolEntries.Count} items)";
+                        LogGiveawayHistory(selectedWinner, bundlePrize, selectedPoolEntries.Count, "RandomPool:PrizeBundle");
                         return;
                     }
 
                     string amountPrefix = prizeAmount > 1 ? $"{prizeAmount} × " : string.Empty;
                     string chatMsg = $"@{selectedWinner} won {amountPrefix}{prizeName}! Congratulations!";
                     _twitch?.SendMessageAsync(chatMsg);
+
+                    LogGiveawayHistory(selectedWinner, prizeName, prizeAmount, mode == GiveawayMode.PrizeOnly ? "PrizeOnly" : "RandomPool:Prize");
                 },
                 winner,
                 _settings.SlotRollDurationSeconds,
@@ -1055,11 +1396,10 @@ namespace Gw2Giveaway
 
         private async void OpenPrizeBank_Click(object sender, RoutedEventArgs e)
         {
-            // If window is already open, just activate it
-            if (_bankWindow != null)
+            if (_bankWindow?.IsVisible == true)
             {
-                _bankWindow.Show();
-                _bankWindow.Activate();
+                _bankWindow.Close();
+                UpdateOverlayToggleButtons();
                 return;
             }
 
@@ -1072,7 +1412,7 @@ namespace Gw2Giveaway
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Failed to load item database: {ex.Message}");
+                    DialogService.ShowInfo($"Failed to load item database: {ex.Message}");
                     return;
                 }
             }
@@ -1080,18 +1420,42 @@ namespace Gw2Giveaway
             // Save settings first to capture the current checkbox state
             SaveSettings();
 
-            // Load the prize bank from file
-            LoadBankFromFile();
-            Bank.Hydrate();
+            if (_bankWindow == null)
+            {
+                // Load the prize bank from file
+                LoadBankFromFile();
+                Bank.Hydrate();
 
-            // Create a fresh BankWindow instance
-            _bankWindow = new BankWindow(Bank, SaveBank, _settings.ShowPrizeRarityBadges);
+                // Create a fresh BankWindow instance
+                _bankWindow = new BankWindow(Bank, SaveBank, _settings.ShowPrizeRarityBadges);
+                ApplySavedWindowBounds(_bankWindow, _settings.PrizeBankLeft, _settings.PrizeBankTop, _settings.PrizeBankWidth, _settings.PrizeBankHeight);
+                _bankWindow.IsVisibleChanged += BankWindow_IsVisibleChanged;
 
-            // Clean up reference when bank window is closed
-            _bankWindow.Closed += (s, ev) => _bankWindow = null;
+                // Clean up reference when bank window is closed
+                _bankWindow.Closed += (s, ev) =>
+                {
+                    if (TryCaptureWindowBounds(_bankWindow, out var left, out var top, out var width, out var height))
+                    {
+                        _settings.PrizeBankLeft = left;
+                        _settings.PrizeBankTop = top;
+                        _settings.PrizeBankWidth = width;
+                        _settings.PrizeBankHeight = height;
+                        PersistSettings();
+                    }
+
+                    _bankWindow = null;
+                    UpdateOverlayToggleButtons();
+                };
+            }
 
             _bankWindow.Show();
             _bankWindow.Activate();
+            UpdateOverlayToggleButtons();
+        }
+
+        private void BankWindow_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            UpdateOverlayToggleButtons();
         }
 
         private void ClearEntrants_Click(object sender, RoutedEventArgs e)
@@ -1137,7 +1501,7 @@ namespace Gw2Giveaway
 
                 if (filledSlots.Count == 0)
                 {
-                    MessageBox.Show("No items in the bank to roll!");
+                    DialogService.ShowInfo("No items in the bank to roll!");
                     return;
                 }
 
@@ -1185,11 +1549,12 @@ namespace Gw2Giveaway
                 string prizeName = slot.Item?.Name ?? slot.CustomName ?? "Unknown";
                 string amountPrefix = win.WinAmount > 1 ? $"{win.WinAmount} × " : "";
                 await _twitch?.SendMessageAsync($"🏦 @{winnerName} won {amountPrefix}{prizeName}! Congrats!");
+                LogGiveawayHistory(winnerName ?? "winner", prizeName, win.WinAmount, source);
             }
             catch (Exception ex)
             {
                 AppLogger.LogError("PerformBankRoll", ex);
-                MessageBox.Show($"Bank roll error: {ex.Message}");
+                DialogService.ShowInfo($"Bank roll error: {ex.Message}");
             }
         }
 
@@ -1221,14 +1586,14 @@ namespace Gw2Giveaway
         {
             if (RedeemRewardCombo.SelectedItem is not ChannelPointReward reward)
             {
-                MessageBox.Show("Select a reward");
+                DialogService.ShowInfo("Select a reward");
                 return;
             }
 
             string username = RedeemUsernameText.Text.Trim();
             if (string.IsNullOrWhiteSpace(username))
             {
-                MessageBox.Show("Enter username");
+                DialogService.ShowInfo("Enter username");
                 return;
             }
 
@@ -1291,6 +1656,7 @@ namespace Gw2Giveaway
                 if (prizeName == "Gold") chatPrize = $"{amount} Gold";
 
                 _twitch?.SendMessageAsync($"@{username} redeemed channel point and instantly won {chatPrize}! Congrats!");
+                LogGiveawayHistory(username, prizeName, amount, "ChannelPoint:InstantBankRoll");
             });
         }
         private void RemoveChannelPointReward_Click(object sender, RoutedEventArgs e)
@@ -1302,14 +1668,14 @@ namespace Gw2Giveaway
             }
             else
             {
-                MessageBox.Show("Select a reward from the list to remove it.");
+                DialogService.ShowInfo("Select a reward from the list to remove it.");
             }
         }
         private void StartEntries_Click(object sender, RoutedEventArgs e)
         {
             if (_entriesOpen)
             {
-                MessageBox.Show("Entries already open!");
+                DialogService.ShowInfo("Entries already open!");
                 return;
             }
             Trivia.IsTriviaPaused = true;
@@ -1340,7 +1706,7 @@ namespace Gw2Giveaway
         {
             if (!_entriesOpen)
             {
-                MessageBox.Show("Entries not open!");
+                DialogService.ShowInfo("Entries not open!");
                 return;
             }
 
@@ -1514,6 +1880,232 @@ namespace Gw2Giveaway
             }
 
             return entries;
+        }
+
+        private async Task RefreshDataManagementViewAsync(string? query = null)
+        {
+            if (DataViewersList == null || DataStatusText == null)
+                return;
+
+            try
+            {
+                var rows = await _databaseService.SearchViewersAsync(query, 500);
+                DataViewersList.ItemsSource = rows.Select(r => new TriviaViewerRow
+                {
+                    Username = r.Username,
+                    Iq = r.Iq
+                }).ToList();
+
+                if (DataHistoryList != null)
+                {
+                    DataHistoryList.ItemsSource = _giveawayHistory
+                        .OrderByDescending(h => h.TimestampUtc)
+                        .Take(300)
+                        .Select(h => new
+                        {
+                            Date = h.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"),
+                            Winner = h.Winner,
+                            Prize = h.Amount > 1 ? $"{h.Amount} × {h.Prize}" : h.Prize,
+                            Source = h.Source
+                        })
+                        .ToList();
+                }
+
+                DataStatusText.Text = $"Loaded {rows.Count} trivia records • {_giveawayHistory.Count} giveaway history entries";
+            }
+            catch (Exception ex)
+            {
+                AppLogger.LogError("MainWindow.RefreshDataManagementViewAsync", ex);
+                DataStatusText.Text = "Failed to load data";
+            }
+        }
+
+        private async void DataSearch_Click(object sender, RoutedEventArgs e)
+        {
+            string query = DataViewerSearchText?.Text?.Trim() ?? string.Empty;
+            await RefreshDataManagementViewAsync(query);
+        }
+
+        private async void DataRefresh_Click(object sender, RoutedEventArgs e)
+        {
+            if (DataViewerSearchText != null)
+                DataViewerSearchText.Text = string.Empty;
+
+            await RefreshDataManagementViewAsync();
+        }
+
+        private async void DataClearAll_Click(object sender, RoutedEventArgs e)
+        {
+            var result = DialogService.ShowConfirm(
+                "Clear all saved Trivia IQ records? This cannot be undone.",
+                "Clear Trivia Data",
+                yesText: "Clear",
+                noText: "Cancel",
+                cancelText: "Cancel");
+
+            if (result != MessageBoxResult.Yes)
+                return;
+
+            try
+            {
+                await _databaseService.ClearAllViewersAsync();
+                _giveawayHistory.Clear();
+                SaveSettings();
+                await RefreshDataManagementViewAsync();
+                DialogService.ShowInfo("All Trivia IQ and giveaway history data has been cleared.");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.LogError("MainWindow.DataClearAll_Click", ex);
+                DialogService.ShowInfo("Failed to clear trivia data: " + ex.Message);
+            }
+        }
+
+        private void ExportAppBackup_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                SaveSettings();
+                SaveBank();
+
+                var dialog = new SaveFileDialog
+                {
+                    Title = "Export Gw2Giveaway Backup",
+                    Filter = "Zip files (*.zip)|*.zip",
+                    FileName = $"Gw2Giveaway-backup-{DateTime.Now:yyyyMMdd-HHmmss}.zip",
+                    AddExtension = true,
+                    DefaultExt = ".zip"
+                };
+
+                if (dialog.ShowDialog() != true)
+                    return;
+
+                string tempRoot = Path.Combine(Path.GetTempPath(), "Gw2GiveawayBackup", Guid.NewGuid().ToString("N"));
+                string tempData = Path.Combine(tempRoot, "Data");
+                Directory.CreateDirectory(tempData);
+
+                if (Directory.Exists(DataFolder))
+                {
+                    foreach (string file in Directory.GetFiles(DataFolder, "*", SearchOption.AllDirectories))
+                    {
+                        string relative = Path.GetRelativePath(DataFolder, file);
+                        string target = Path.Combine(tempData, relative);
+                        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                        File.Copy(file, target, overwrite: true);
+                    }
+                }
+
+                if (File.Exists(ViewersDbFile))
+                {
+                    File.Copy(ViewersDbFile, Path.Combine(tempRoot, "viewers.db"), overwrite: true);
+                }
+
+                if (File.Exists(dialog.FileName))
+                    File.Delete(dialog.FileName);
+
+                ZipFile.CreateFromDirectory(tempRoot, dialog.FileName, CompressionLevel.Optimal, includeBaseDirectory: false);
+                Directory.Delete(tempRoot, recursive: true);
+
+                DialogService.ShowInfo("Backup exported successfully.");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.LogError("MainWindow.ExportAppBackup_Click", ex);
+                DialogService.ShowInfo("Backup export failed: " + ex.Message);
+            }
+        }
+
+        private async void ImportAppBackup_Click(object sender, RoutedEventArgs e)
+        {
+            var confirm = DialogService.ShowConfirm(
+                "Importing backup will overwrite current settings, trivia data, and bank data. Continue?",
+                "Import Backup",
+                yesText: "Import",
+                noText: "Cancel",
+                cancelText: "Cancel");
+
+            if (confirm != MessageBoxResult.Yes)
+                return;
+
+            try
+            {
+                var dialog = new OpenFileDialog
+                {
+                    Title = "Import Gw2Giveaway Backup",
+                    Filter = "Zip files (*.zip)|*.zip",
+                    CheckFileExists = true,
+                    Multiselect = false
+                };
+
+                if (dialog.ShowDialog() != true)
+                    return;
+
+                _overlay?.Close();
+                _triviaOverlay?.Close();
+                _bankWindow?.Close();
+
+                string extractRoot = Path.Combine(Path.GetTempPath(), "Gw2GiveawayBackupImport", Guid.NewGuid().ToString("N"));
+                Directory.CreateDirectory(extractRoot);
+                ZipFile.ExtractToDirectory(dialog.FileName, extractRoot);
+
+                string extractedData = Path.Combine(extractRoot, "Data");
+                if (Directory.Exists(extractedData))
+                {
+                    Directory.CreateDirectory(DataFolder);
+                    foreach (string file in Directory.GetFiles(extractedData, "*", SearchOption.AllDirectories))
+                    {
+                        string relative = Path.GetRelativePath(extractedData, file);
+                        string target = Path.Combine(DataFolder, relative);
+                        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                        File.Copy(file, target, overwrite: true);
+                    }
+                }
+
+                string extractedDb = Path.Combine(extractRoot, "viewers.db");
+                if (File.Exists(extractedDb))
+                {
+                    File.Copy(extractedDb, ViewersDbFile, overwrite: true);
+                }
+
+                Directory.Delete(extractRoot, recursive: true);
+
+                LoadSettings();
+                LoadBankFromFile();
+                await RefreshDataManagementViewAsync();
+                UpdateOverlayToggleButtons();
+
+                DialogService.ShowInfo("Backup imported successfully.");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.LogError("MainWindow.ImportAppBackup_Click", ex);
+                DialogService.ShowInfo("Backup import failed: " + ex.Message);
+            }
+        }
+
+        private void LogGiveawayHistory(string winner, string prize, long amount, string source)
+        {
+            try
+            {
+                _giveawayHistory.Insert(0, new GiveawayHistoryEntry
+                {
+                    TimestampUtc = DateTime.UtcNow,
+                    Winner = winner?.Trim() ?? string.Empty,
+                    Prize = prize?.Trim() ?? string.Empty,
+                    Amount = amount <= 0 ? 1 : amount,
+                    Source = source?.Trim() ?? string.Empty
+                });
+
+                while (_giveawayHistory.Count > 1000)
+                    _giveawayHistory.RemoveAt(_giveawayHistory.Count - 1);
+
+                SaveSettings();
+                _ = RefreshDataManagementViewAsync(DataViewerSearchText?.Text);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.LogError("MainWindow.LogGiveawayHistory", ex);
+            }
         }
 
         private readonly record struct TwitchOAuthToken(string AccessToken, string RefreshToken);

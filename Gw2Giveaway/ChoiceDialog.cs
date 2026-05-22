@@ -15,11 +15,11 @@ namespace Gw2Giveaway
             Title = title;
             Width = 520;
             Height = 260;
-            WindowStartupLocation = WindowStartupLocation.CenterScreen;
             ResizeMode = ResizeMode.NoResize;
             AllowsTransparency = true;
             WindowStyle = WindowStyle.None;
             Background = Brushes.Transparent;
+            DialogService.ConfigureDialogWindow(this);
 
             Border outer = new Border
             {
@@ -43,7 +43,9 @@ namespace Gw2Giveaway
                 Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFF3F3EA")),
                 FontSize = 20,
                 FontWeight = FontWeights.Bold,
-                Margin = new Thickness(0, 0, 0, 10)
+                TextAlignment = TextAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 14)
             };
 
             TextBlock label = new TextBlock
@@ -52,12 +54,19 @@ namespace Gw2Giveaway
                 Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFF3F3EA")),
                 FontSize = 15,
                 TextWrapping = TextWrapping.Wrap,
+                TextAlignment = TextAlignment.Center,
                 Margin = new Thickness(0, 0, 0, 8)
             };
 
-            StackPanel content = new StackPanel();
-            content.Children.Add(header);
-            content.Children.Add(label);
+            Border promptCard = new Border
+            {
+                CornerRadius = new CornerRadius(10),
+                Background = new SolidColorBrush(Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF)),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(0x40, 0xFF, 0xFF, 0xFF)),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(14),
+                Child = label
+            };
 
             StackPanel buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0) };
 
@@ -73,10 +82,12 @@ namespace Gw2Giveaway
             buttons.Children.Add(no);
             buttons.Children.Add(yes);
 
-            Grid.SetRow(content, 0);
+            Grid.SetRow(header, 0);
+            Grid.SetRow(promptCard, 1);
             Grid.SetRow(buttons, 2);
 
-            grid.Children.Add(content);
+            grid.Children.Add(header);
+            grid.Children.Add(promptCard);
             grid.Children.Add(buttons);
 
             outer.Child = grid;

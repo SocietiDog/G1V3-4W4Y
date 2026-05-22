@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:Gw2Giveaway"
         xmlns:conv="clr-namespace:Gw2Giveaway.Converters"
-        Title="GW2 Giveaway Tool" Height="1050" Width="720"
+        Title="G1V3 - 4W4Y" Height="1080" Width="720"
         AllowsTransparency="True" Background="Transparent" WindowStyle="None" ResizeMode="CanResizeWithGrip">
     <Window.Resources>
         <Style x:Key="BankButton" TargetType="Button">
@@ -196,13 +196,19 @@
                Margin="0,0,20,0"/>
 
                             </StackPanel >
-                            <StackPanel>
+                            <StackPanel Orientation="Horizontal">
                                 <Button Content="Refresh Database" 
 Click="RefreshDatabase_Click" 
 Style="{StaticResource BankButton}"
 Width="120"
 Height="27"
 FontSize="12" Padding="0,0,0,0" HorizontalAlignment="Left" Margin="8,0,8,8"/>
+                                <Button Content="View Disclaimer"
+Click="ViewDisclaimer_Click"
+Style="{StaticResource BankButton}"
+Width="120"
+Height="27"
+FontSize="12" Padding="0,0,0,0" HorizontalAlignment="Left" Margin="0,0,8,8"/>
                             </StackPanel>
                             <!-- Twitch Connection -->
                             <TextBlock Text="Twitch Connection" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
@@ -270,6 +276,14 @@ FontSize="12" Padding="0,0,0,0" HorizontalAlignment="Left" Margin="8,0,8,8"/>
                 <TabItem Header="Advanced" Style="{StaticResource Gw2TabItemStyle}">
                     <StackPanel Margin="20">
                         <TextBlock Text="Channel Point Rewards (Manual Redeem)" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
+
+                        <TextBlock x:Name="ChannelPointsAvailabilityText"
+                                   Text="Checking channel point availability..."
+                                   FontSize="12"
+                                   Foreground="Gray"
+                                   Margin="0,0,0,10"/>
+
+                        <StackPanel x:Name="ChannelPointsControlsPanel">
 
                         <TextBlock Text="Configure multiple channel point rewards. Redeem manually below." FontSize="12" Foreground="Gray" Margin="0,0,0,10"/>
 
@@ -358,6 +372,7 @@ FontSize="12" Padding="0,0,0,0" HorizontalAlignment="Left" Margin="8,0,8,8"/>
                                 <Button Content="Manual Redeem" Click="ManualRedeem_Click" Style="{StaticResource BankButton}" Margin="10,0,0,0"/>
                             </StackPanel>
                         </Grid>
+                        </StackPanel>
                     </StackPanel>
                 </TabItem>
                 <TabItem Header="Prize/Roll Settings" Style="{StaticResource Gw2TabItemStyle}">
@@ -455,7 +470,7 @@ FontSize="12" Padding="0,0,0,0" HorizontalAlignment="Left" Margin="8,0,8,8"/>
                         <Image x:Name="ClassicPoolPreviewImage" Height="140" Stretch="Uniform" Margin="0,0,0,16"/>
 
                         <!-- Bank -->
-                        <Button Content="Open Prize Bank Editor" Click="OpenPrizeBank_Click" Style="{StaticResource BankButton}" Width="300" Height="60" FontSize="20" Padding="5,0,5,0"/>
+                        <Button x:Name="OpenPrizeBankButton" Content="Open Prize Bank Editor" Click="OpenPrizeBank_Click" Style="{StaticResource BankButton}" Width="Auto" MinWidth="300" Height="60" FontSize="20" Padding="5,0,5,0"/>
 
 
 
@@ -520,7 +535,7 @@ Margin="0,0,0,20"/>
                                 <Button Content="Stop Trivia" Command="{Binding Trivia.StopTriviaCommand}" Style="{StaticResource BankButton}" Width="150"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                <Button Content="Show Trivia Overlay" Click="ShowTriviaOverlay_Click" Style="{StaticResource BankButton}" Width="250" Height="50" FontSize="18"/>
+                                <Button x:Name="ShowTriviaOverlayButton" Content="Show Trivia Overlay" Click="ShowTriviaOverlay_Click" Style="{StaticResource BankButton}" Width="Auto" MinWidth="250" Height="50" FontSize="18"/>
                                 <Button Content="Setting" Click="OpenTriviaSettings_Click" Style="{StaticResource BankButton}" Width="150" Height="50" />
                             </StackPanel>
 
@@ -529,11 +544,60 @@ Margin="0,0,0,20"/>
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>
+                <TabItem Header="Data Management" Style="{StaticResource Gw2TabItemStyle}">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="20">
+                            <TextBlock Text="Trivia Data" FontSize="22" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,12"/>
+                            <TextBlock Text="Lookup and manage saved IQ points for chat users." Foreground="Gray" FontSize="12" Margin="0,0,0,10"/>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                <TextBox x:Name="DataViewerSearchText" Width="280" Height="32" ToolTip="Search username"/>
+                                <Button Content="Search" Click="DataSearch_Click" Style="{StaticResource BankButton}" Width="100" Height="32" FontSize="12" Padding="4,0,4,0"/>
+                                <Button Content="Refresh" Click="DataRefresh_Click" Style="{StaticResource BankButton}" Width="100" Height="32" FontSize="12" Padding="4,0,4,0"/>
+                            </StackPanel>
+
+                            <ListView x:Name="DataViewersList" Height="160" Margin="0,0,0,10" Background="#AA000000" Foreground="White" BorderBrush="#FFEFDFDF">
+                                <ListView.View>
+                                    <GridView>
+                                        <GridViewColumn Header="Username" Width="260" DisplayMemberBinding="{Binding Username}"/>
+                                        <GridViewColumn Header="IQ" Width="120" DisplayMemberBinding="{Binding Iq}"/>
+                                    </GridView>
+                                </ListView.View>
+                            </ListView>
+
+                            <TextBlock Text="Giveaway Winner History" FontSize="18" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,8"/>
+                            <ListView x:Name="DataHistoryList" Height="170" Margin="0,0,0,10" Background="#AA000000" Foreground="White" BorderBrush="#FFEFDFDF">
+                                <ListView.View>
+                                    <GridView>
+                                        <GridViewColumn Header="Date" Width="150" DisplayMemberBinding="{Binding Date}"/>
+                                        <GridViewColumn Header="Winner" Width="120" DisplayMemberBinding="{Binding Winner}"/>
+                                        <GridViewColumn Header="Prize" Width="190" DisplayMemberBinding="{Binding Prize}"/>
+                                        <GridViewColumn Header="Source" Width="120" DisplayMemberBinding="{Binding Source}"/>
+                                    </GridView>
+                                </ListView.View>
+                            </ListView>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                <TextBlock x:Name="DataStatusText" Text="Loaded 0 records" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <Button Content="Clear Trivia + History" Click="DataClearAll_Click" Style="{StaticResource BankButton}" Width="170" Height="34" FontSize="12" Padding="4,0,4,0"/>
+                            </StackPanel>
+
+                            <Separator Margin="0,8,0,12"/>
+
+                            <TextBlock Text="Backup / Restore" FontSize="22" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,12"/>
+                            <TextBlock Text="Export includes settings, giveaway history, prize bank, logs, and trivia DB. Import restores from a backup zip." Foreground="Gray" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="Export App Backup" Click="ExportAppBackup_Click" Style="{StaticResource BankButton}" Width="160" Height="40" FontSize="12" Padding="4,0,4,0"/>
+                                <Button Content="Import App Backup" Click="ImportAppBackup_Click" Style="{StaticResource BankButton}" Width="160" Height="40" FontSize="12" Padding="4,0,4,0"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
             </TabControl>
 
             <!-- Bottom buttons -->
             <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,20,0,10">
-                <Button Content="Show Overlay" Click="ShowOverlay_Click" Style="{StaticResource BankButton}" Width="115" Height="37" FontSize="14" Margin="10" Padding="5,6,5,6"/>
+                <Button x:Name="ShowOverlayButton" Content="Show Overlay" Click="ShowOverlay_Click" Style="{StaticResource BankButton}" Width="Auto" MinWidth="115" Height="37" FontSize="14" Margin="10" Padding="5,6,5,6"/>
                 <Button Content="ROLL WINNER" Click="StartRoll_Click" Style="{StaticResource BankButton}" Width="148" Height="44" FontSize="16" FontWeight="ExtraBold" Margin="10" Padding="5,6,5,6"/>
                 <Button Content="Clear Entrants" Click="ClearEntrants_Click" Style="{StaticResource BankButton}" Width="121" Height="40" FontSize="14" Margin="10" Padding="5,6,5,6"/>
             </StackPanel>

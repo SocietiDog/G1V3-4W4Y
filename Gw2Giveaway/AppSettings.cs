@@ -21,7 +21,7 @@ namespace Gw2Giveaway
     public class AppSettings
     {
         public string TwitchChannel { get; set; } = "";
-        public string TwitchBotName { get; set; } = "";
+        public string TwitchBotName { get; set; } = "G1V3 - 4W4Y";
         [JsonIgnore]
         public string TwitchOAuth { get; set; } = "";
         [JsonProperty("TwitchOAuth")]
@@ -44,6 +44,18 @@ namespace Gw2Giveaway
         public int SlotRollDurationSeconds { get; set; } = 12;  // Default: 12 seconds
         public int BankRollDurationSeconds { get; set; } = 5;   // Default: 5 seconds for bank highlight animation
         public bool AutoOpenOverlay { get; set; } = false;
+        public double? OverlayLeft { get; set; }
+        public double? OverlayTop { get; set; }
+        public double? OverlayWidth { get; set; }
+        public double? OverlayHeight { get; set; }
+        public double? TriviaOverlayLeft { get; set; }
+        public double? TriviaOverlayTop { get; set; }
+        public double? TriviaOverlayWidth { get; set; }
+        public double? TriviaOverlayHeight { get; set; }
+        public double? PrizeBankLeft { get; set; }
+        public double? PrizeBankTop { get; set; }
+        public double? PrizeBankWidth { get; set; }
+        public double? PrizeBankHeight { get; set; }
         public string OverlayBackground { get; set; } = "#DD000000";
         public string OverlayInnerBackground { get; set; } = "#EE000000";
         public string OverlayBorderColor { get; set; } = "#FFD700";
@@ -54,11 +66,25 @@ namespace Gw2Giveaway
         public string GoldColor { get; set; } = "#FFFF00";
         public int FirstCorrectReward { get; set; } = 150;
         public int LaterCorrectReward { get; set; } = 50;
+        public bool DisclaimerAccepted { get; set; } = false;
+        public int DisclaimerAcceptedVersion { get; set; } = 0;
 
         // Optional: Add BroadcasterId here too for channel points
         public string BroadcasterId { get; set; } = "";
 
+        public ObservableCollection<GiveawayHistoryEntry> GiveawayHistory { get; set; } = new();
+
     }
+
+    public class GiveawayHistoryEntry
+    {
+        public DateTime TimestampUtc { get; set; } = DateTime.UtcNow;
+        public string Winner { get; set; } = string.Empty;
+        public string Prize { get; set; } = string.Empty;
+        public long Amount { get; set; } = 1;
+        public string Source { get; set; } = string.Empty;
+    }
+
     public class ChannelPointReward
     {
         public string Title { get; set; } = "Channel Point Reward";

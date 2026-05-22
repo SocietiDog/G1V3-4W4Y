@@ -16,11 +16,11 @@ namespace Gw2Giveaway
             Title = "Input";
             Width = 400;
             Height = 200;
-            WindowStartupLocation = WindowStartupLocation.CenterScreen;
             ResizeMode = ResizeMode.NoResize;
             AllowsTransparency = true;
             WindowStyle = WindowStyle.None;
             Background = Brushes.Transparent;
+            DialogService.ConfigureDialogWindow(this);
 
             // Outer border matching app theme
             Border outer = new Border

@@ -3,12 +3,12 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:Gw2Giveaway"
         xmlns:conv="clr-namespace:Gw2Giveaway.Converters"
-        Title="GW2 Prize Bank Editor" Height="500" Width="1050"
+        Title="G1V3 - 4W4Y Prize Bank" Height="500" Width="1050"
         AllowsTransparency="True"
 Background="Transparent"
 WindowStyle="None"
 ResizeMode="CanResizeWithGrip"
-WindowStartupLocation="CenterScreen">
+WindowStartupLocation="Manual">
     <Window.Resources>
         <Style x:Key="BankButton" TargetType="Button">
             <!-- Your existing style unchanged -->

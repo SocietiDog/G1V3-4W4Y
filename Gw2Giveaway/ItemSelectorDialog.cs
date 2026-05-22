@@ -20,10 +20,10 @@ namespace Gw2Giveaway
             Title = "Search & Select Item";
             Width = 700;
             Height = 750;
-            WindowStartupLocation = WindowStartupLocation.CenterScreen;
             AllowsTransparency = true;
             WindowStyle = WindowStyle.None;
             Background = Brushes.Transparent;
+            DialogService.ConfigureDialogWindow(this);
 
             // Outer border matching app theme
             Border outer = new Border
@@ -201,7 +201,7 @@ namespace Gw2Giveaway
             }
             else
             {
-                MessageBox.Show("Please select a valid item from the list.");
+                DialogService.ShowInfo("Please select a valid item from the list.");
             }
         }
 

@@ -95,7 +95,7 @@ namespace Gw2Giveaway
         {
             try
             {
-                await SendMessageAsync("Giveaway bot going offline. Thanks for playing! 👋");
+                await SendMessageAsync("G1V3 - 4W4Y bot going offline. Thanks for playing! 👋");
             }
             catch (Exception ex)
             {

@@ -17,7 +17,7 @@ namespace Gw2Giveaway
     {
         public int Rank { get; set; }
         public string Username { get; set; } = string.Empty;
-        public long Gold { get; set; }
+        public long Iq { get; set; }
     }
 
     public class TriviaViewModel : INotifyPropertyChanged
@@ -167,7 +167,7 @@ namespace Gw2Giveaway
             set => SetField(ref _laterCorrectReward, value, () => OnPropertyChanged(nameof(RewardsText)));
         }
 
-        public string RewardsText => $"First: +{FirstCorrectReward} Gold • Correct: +{LaterCorrectReward} Gold";
+        public string RewardsText => $"First: +{FirstCorrectReward} IQ • Correct: +{LaterCorrectReward} IQ";
 
         private string _currentQuestion = "";
         public string CurrentQuestion
@@ -206,7 +206,7 @@ namespace Gw2Giveaway
         {
             _twitch = twitch;
 
-            StartTriviaCommand = new RelayCommand(() => StartTriviaRound(), () => _isConnected && IsTriviaEnabled && !_triviaActive && !IsTriviaPaused);
+            StartTriviaCommand = new RelayCommand(() => StartTriviaRound(), () => IsTriviaEnabled && !_triviaActive && !IsTriviaPaused);
             StopTriviaCommand = new RelayCommand(() => StopTriviaRound(), () => _triviaActive);
 
             _twitch.OnJoinedChannel += () =>
@@ -215,6 +215,13 @@ namespace Gw2Giveaway
                 OnPropertyChanged(nameof(ConnectionStatus));
                 CommandManager.InvalidateRequerySuggested();
                 _ = UpdateLeaderboardAsync();
+            };
+
+            _twitch.OnConnectionError += _ =>
+            {
+                _isConnected = false;
+                OnPropertyChanged(nameof(ConnectionStatus));
+                CommandManager.InvalidateRequerySuggested();
             };
 
             _ = Task.Run(async () =>
@@ -234,61 +241,76 @@ namespace Gw2Giveaway
         {
             if (_triviaActive || IsTriviaPaused) return;
 
-            _triviaActive = true;
-            LeaderboardVisible = false;
-            _correctAnswerers.Clear();
-            _firstCorrectAwarded = false;
-            CommandManager.InvalidateRequerySuggested();
-
-            var questionData = await _trivia.GenerateQuestion(SelectedCategory);
-
-            string overlayQuestion = $"[Category: {questionData.Category}] {questionData.QuestionText}\n\n";
-            for (int i = 0; i < 4; i++) overlayQuestion += $"{(char)('A' + i)}) {questionData.Options[i]}\n";
-
-            string chatQuestion = $"[Category: {questionData.Category}] {questionData.QuestionText} ";
-            for (int i = 0; i < 4; i++) chatQuestion += $"({(char)('A' + i)}) {questionData.Options[i]} " + (i < 3 ? "| " : "");
-
-            CurrentQuestion = overlayQuestion;
-            _currentCorrectLetter = questionData.CorrectLetter;
-            _currentCorrectFull = questionData.CorrectFull;
-            _questionEndTime = DateTime.UtcNow.AddSeconds(AnswerTimeSeconds);
-            TimeLeft = $"{AnswerTimeSeconds}s";
-
-            _answerTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-            _answerTimer.Tick += (s, e) =>
+            try
             {
-                var remaining = _questionEndTime - DateTime.UtcNow;
-                TimeLeft = remaining.TotalSeconds <= 0 ? "Time's up!" : $"{(int)remaining.TotalSeconds}s";
-            };
-            _answerTimer.Start();
+                _triviaActive = true;
+                LeaderboardVisible = false;
+                _correctAnswerers.Clear();
+                _firstCorrectAwarded = false;
+                CommandManager.InvalidateRequerySuggested();
 
-            SendBotMessage($"TRIVIA TIME! {chatQuestion} Answer with !answer A/B/C/D ({AnswerTimeSeconds}s!)");
+                var questionData = await _trivia.GenerateQuestion(SelectedCategory);
 
-            _ = Task.Run(async () =>
-            {
-                await Task.Delay(AnswerTimeSeconds * 1000 + 1000);
-                if (!_triviaActive) return;
+                string overlayQuestion = $"[Category: {questionData.Category}] {questionData.QuestionText}\n\n";
+                for (int i = 0; i < 4; i++) overlayQuestion += $"{(char)('A' + i)}) {questionData.Options[i]}\n";
 
-                string summary = _correctAnswerers.Any()
-                    ? $"Round over! {_correctAnswerers.Count} got it right. Correct: ({_currentCorrectLetter}) {_currentCorrectFull}"
-                    : $"Time's up! No one got it. Correct: ({_currentCorrectLetter}) {_currentCorrectFull}";
+                string chatQuestion = $"[Category: {questionData.Category}] {questionData.QuestionText} ";
+                for (int i = 0; i < 4; i++) chatQuestion += $"({(char)('A' + i)}) {questionData.Options[i]} " + (i < 3 ? "| " : "");
 
-                SendBotMessage(summary);
+                CurrentQuestion = overlayQuestion;
+                _currentCorrectLetter = questionData.CorrectLetter;
+                _currentCorrectFull = questionData.CorrectFull;
+                _questionEndTime = DateTime.UtcNow.AddSeconds(AnswerTimeSeconds);
+                TimeLeft = $"{AnswerTimeSeconds}s";
 
-                await UpdateLeaderboardAsync();
-
-                Application.Current.Dispatcher.Invoke(() =>
+                _answerTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+                _answerTimer.Tick += (s, e) =>
                 {
-                    CurrentQuestion = string.Empty;
-                    TimeLeft = "";
-                    _triviaActive = false;
-                    LeaderboardVisible = true;
-                    CommandManager.InvalidateRequerySuggested();
+                    var remaining = _questionEndTime - DateTime.UtcNow;
+                    TimeLeft = remaining.TotalSeconds <= 0 ? "Time's up!" : $"{(int)remaining.TotalSeconds}s";
+                };
+                _answerTimer.Start();
 
-                    // Hide leaderboard after 20 seconds
-                    Task.Delay(20000).ContinueWith(_ => Application.Current.Dispatcher.Invoke(() => LeaderboardVisible = false));
+                SendBotMessage($"TRIVIA TIME! {chatQuestion} Answer with !answer A/B/C/D ({AnswerTimeSeconds}s!)");
+
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(AnswerTimeSeconds * 1000 + 1000);
+                    if (!_triviaActive) return;
+
+                    string summary = _correctAnswerers.Any()
+                        ? $"Round over! {_correctAnswerers.Count} got it right. Correct: ({_currentCorrectLetter}) {_currentCorrectFull}"
+                        : $"Time's up! No one got it. Correct: ({_currentCorrectLetter}) {_currentCorrectFull}";
+
+                    SendBotMessage(summary);
+
+                    await UpdateLeaderboardAsync();
+
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        CurrentQuestion = string.Empty;
+                        TimeLeft = "";
+                        _triviaActive = false;
+                        LeaderboardVisible = true;
+                        CommandManager.InvalidateRequerySuggested();
+
+                        // Hide leaderboard after 20 seconds
+                        Task.Delay(20000).ContinueWith(_ => Application.Current.Dispatcher.Invoke(() => LeaderboardVisible = false));
+                    });
                 });
-            });
+            }
+            catch (Exception ex)
+            {
+                AppLogger.LogError("TriviaViewModel.StartTriviaRound", ex);
+
+                _answerTimer?.Stop();
+                CurrentQuestion = string.Empty;
+                TimeLeft = string.Empty;
+                _triviaActive = false;
+                CommandManager.InvalidateRequerySuggested();
+
+                SendBotMessage("I couldn't start a trivia round right now. Please try again in a moment.");
+            }
         }
 
         private void StopTriviaRound()
@@ -329,11 +351,11 @@ namespace Gw2Giveaway
                 return;
             }
 
-            // !gold
-            if (msgLower == "!gold")
+            // !iq / !qr / !gold (legacy aliases)
+            if (msgLower == "!iq" || msgLower == "!qr" || msgLower == "!gold")
             {
-                long gold = await _db.GetGoldAsync(username);
-                SendBotMessage($"@{username} has {gold} Gold.");
+                long iq = await _db.GetIqAsync(username);
+                SendBotMessage($"@{username} has {iq} IQ.");
                 return;
             }
 
@@ -347,7 +369,7 @@ namespace Gw2Giveaway
                 }
                 else
                 {
-                    string lines = string.Join(" | ", TopLeaderboard.Select(e => $"{e.Rank}. {e.Username} — {e.Gold} Gold"));
+                    string lines = string.Join(" | ", TopLeaderboard.Select(e => $"{e.Rank}. {e.Username} — {e.Iq} IQ"));
                     SendBotMessage($"Top 5: {lines}");
                 }
                 return;
@@ -364,10 +386,10 @@ namespace Gw2Giveaway
                     int reward = _firstCorrectAwarded ? LaterCorrectReward : FirstCorrectReward;
                     string bonus = _firstCorrectAwarded ? "" : " (FIRST!)";
 
-                    await _db.AddGoldAsync(username, reward);
+                    await _db.AddIqAsync(username, reward);
                     await UpdateLeaderboardAsync();
 
-                    SendBotMessage($"@{username} got it right{bonus}! +{reward} Gold");
+                    SendBotMessage($"@{username} got it right{bonus}! +{reward} IQ");
 
                     if (!_firstCorrectAwarded) _firstCorrectAwarded = true;
                 }
@@ -386,7 +408,7 @@ namespace Gw2Giveaway
                     {
                         Rank = i + 1,
                         Username = top[i].Username,
-                        Gold = top[i].Gold
+                        Iq = top[i].Iq
                     });
                 }
             });

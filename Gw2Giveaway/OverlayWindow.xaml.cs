@@ -35,7 +35,7 @@ namespace Gw2Giveaway
 
         private void Close_Click(object sender, RoutedEventArgs e)
         {
-            Hide(); // Hide instead of close – keeps instance alive for reuse
+            Close();
         }
 
         private void HideAllGrids()
@@ -60,7 +60,8 @@ namespace Gw2Giveaway
                 bitmap.UriSource = new Uri(imageUrl);
                 bitmap.CacheOption = BitmapCacheOption.OnLoad;
                 bitmap.EndInit();
-                bitmap.Freeze();
+                if (bitmap.CanFreeze)
+                    bitmap.Freeze();
                 PrizeImage.Source = bitmap;
             }
             else
@@ -468,7 +469,6 @@ namespace Gw2Giveaway
 
             if (SlotReelContent.RenderTransform is TranslateTransform resetTransform)
                 resetTransform.Y = 0;
-
             int minTravelItems = Math.Min(extendedList.Count - 1, Math.Max(12, entrants.Count * 3));
             int targetIndex;
 
@@ -519,7 +519,6 @@ namespace Gw2Giveaway
                 pulse.AutoReverse = true;
                 pulse.RepeatBehavior = new RepeatBehavior(3);
                 SlotWinnerHighlight.BeginAnimation(OpacityProperty, pulse);
-
                 string winner = extendedList[targetIndex];
 
                 // Short pause, then reveal winner
@@ -647,7 +646,7 @@ namespace Gw2Giveaway
                 if (landOnBank)
                 {
                     // Bank was picked — close the overlay (bank window will open from callback)
-                    Hide();
+                    Close();
                 }
                 else
                 {
@@ -663,8 +662,7 @@ namespace Gw2Giveaway
             await Task.Delay(milliseconds);
             Dispatcher.Invoke(() =>
             {
-                // Reset back to prize screen for next time
-                ResetToPrize();
+                Close();
             });
         }
     }
