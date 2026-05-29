@@ -3,8 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:Gw2Giveaway"
         xmlns:conv="clr-namespace:Gw2Giveaway.Converters"
-        Title="G1V3 - 4W4Y" Height="1080" Width="720"
-        AllowsTransparency="True" Background="Transparent" WindowStyle="None" ResizeMode="CanResizeWithGrip">
+        Title="G1V3 - 4W4Y Beta" Height="980" Width="800"
+        AllowsTransparency="True" Background="Transparent" WindowStyle="None" ResizeMode="CanResizeWithGrip"
+        WindowStartupLocation="Manual">
     <Window.Resources>
         <Style x:Key="BankButton" TargetType="Button">
             <!-- Same as BankWindow -->
@@ -40,6 +41,8 @@
             </Setter>
         </Style>
 
+        <conv:TwitchNameToGw2NameConverter x:Key="Gw2NameConverter"/>
+        <conv:TwitchNameToGw2VisibilityConverter x:Key="Gw2VisibilityConverter"/>
         <Style TargetType="TextBlock">
             <Setter Property="Foreground" Value="#FFF3F3EA"/>
             <Setter Property="FontSize" Value="14"/>
@@ -141,25 +144,31 @@
             </Grid.RowDefinitions>
 
             <!-- Title bar -->
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="−" Style="{StaticResource BankButton}" Click="MinimizeWindow_Click" FontSize="25" FontWeight="Bold" Width="45" Height="45" Margin="5" Padding="0,10,0,0" Foreground="#FFF3F3EA"/>
-                <Button Content="X" Style="{StaticResource BankButton}" Click="Close_Click" Width="45" Height="45" Margin="5" Padding="0,0,0,0" FontSize="30" VerticalContentAlignment="Center" Foreground="#FFF3F3EA"/>
-            </StackPanel>
+            <Grid Grid.Row="0">
+                <TextBlock x:Name="AppNameVersionText"
+                           Text="Gw2Giveaway"
+                           Foreground="#FFF3F3EA"
+                           FontSize="24"
+                           FontWeight="Bold"
+                           VerticalAlignment="Center"
+                           Margin="8,4,0,0"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="−" Style="{StaticResource BankButton}" Click="MinimizeWindow_Click" FontSize="25" FontWeight="Bold" Width="45" Height="45" Margin="5" Padding="0,10,0,0" Foreground="#FFF3F3EA"/>
+                    <Button Content="X" Style="{StaticResource BankButton}" Click="Close_Click" Width="45" Height="45" Margin="5" Padding="0,0,0,0" FontSize="30" VerticalContentAlignment="Center" Foreground="#FFF3F3EA"/>
+                </StackPanel>
+            </Grid>
 
             <TabControl Grid.Row="1" Background="Transparent" Margin="0,10,0,84" Grid.RowSpan="2" Style="{StaticResource Gw2TabControlStyle}">
-                <TabItem Header="Settings" IsSelected="True" Style="{StaticResource Gw2TabItemStyle}">
-                    <StackPanel Margin="20">
 
-                        <StackPanel Height="539">
-                            <!-- Database -->
+                <!-- ═══════════════════════════════════════════════════════════ PLATFORMS TAB -->
+                <TabItem Header="Platforms" IsSelected="True" Style="{StaticResource Gw2TabItemStyle}">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="20">
+
+                            <!-- ── Database Status ──────────────────────────────────────────── -->
                             <TextBlock Text="Database Status" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,0,0,10">
-                                <ProgressBar x:Name="DatabaseProgress" 
-                 Width="414" 
-                 Height="30" 
-                 Value="0" 
-                 Maximum="100"
-                 Margin="0,0,20,0">
+                                <ProgressBar x:Name="DatabaseProgress" Width="414" Height="30" Value="0" Maximum="100" Margin="0,0,20,0">
                                     <ProgressBar.Style>
                                         <Style TargetType="ProgressBar">
                                             <Setter Property="Foreground" Value="Gold"/>
@@ -169,15 +178,9 @@
                                             <Setter Property="Template">
                                                 <Setter.Value>
                                                     <ControlTemplate TargetType="ProgressBar">
-                                                        <Border Background="{TemplateBinding Background}"
-                                    BorderBrush="{TemplateBinding BorderBrush}"
-                                    BorderThickness="{TemplateBinding BorderThickness}"
-                                    CornerRadius="15">
+                                                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="15">
                                                             <Grid>
-                                                                <Rectangle x:Name="PART_Indicator"
-                                               HorizontalAlignment="Left"
-                                               Fill="{TemplateBinding Foreground}"
-                                               RadiusX="15" RadiusY="15"/>
+                                                                <Rectangle x:Name="PART_Indicator" HorizontalAlignment="Left" Fill="{TemplateBinding Foreground}" RadiusX="15" RadiusY="15"/>
                                                                 <Rectangle x:Name="PART_Track"/>
                                                             </Grid>
                                                         </Border>
@@ -187,32 +190,16 @@
                                         </Style>
                                     </ProgressBar.Style>
                                 </ProgressBar>
-
-                                <TextBlock x:Name="DatabaseStatus" 
-               Text="Loading..." 
-               FontSize="18"
-               Foreground="#FFF3F3EA"
-               VerticalAlignment="Center"
-               Margin="0,0,20,0"/>
-
-                            </StackPanel >
-                            <StackPanel Orientation="Horizontal">
-                                <Button Content="Refresh Database" 
-Click="RefreshDatabase_Click" 
-Style="{StaticResource BankButton}"
-Width="120"
-Height="27"
-FontSize="12" Padding="0,0,0,0" HorizontalAlignment="Left" Margin="8,0,8,8"/>
-                                <Button Content="View Disclaimer"
-Click="ViewDisclaimer_Click"
-Style="{StaticResource BankButton}"
-Width="120"
-Height="27"
-FontSize="12" Padding="0,0,0,0" HorizontalAlignment="Left" Margin="0,0,8,8"/>
+                                <TextBlock x:Name="DatabaseStatus" Text="Loading…" FontSize="18" Foreground="#FFF3F3EA" VerticalAlignment="Center" Margin="0,0,20,0"/>
                             </StackPanel>
-                            <!-- Twitch Connection -->
-                            <TextBlock Text="Twitch Connection" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
-                            <Grid Margin="0,0,0,20" Width="574" HorizontalAlignment="Left" Height="327">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                                <Button Content="Refresh Database" Click="RefreshDatabase_Click" Style="{StaticResource BankButton}" Width="140" Height="27" FontSize="12" Padding="0" Margin="8,0,8,8"/>
+                                <Button Content="View Disclaimer" Click="ViewDisclaimer_Click" Style="{StaticResource BankButton}" Width="120" Height="27" FontSize="12" Padding="0" Margin="0,0,8,8"/>
+                            </StackPanel>
+
+                            <!-- ── Twitch Connection ────────────────────────────────────────── -->
+                            <TextBlock Text="🟣 Twitch Connection" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
+                            <Grid Margin="0,0,0,20" Width="600" HorizontalAlignment="Left">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
@@ -228,270 +215,270 @@ FontSize="12" Padding="0,0,0,0" HorizontalAlignment="Left" Margin="0,0,8,8"/>
                                 <TextBox Grid.Row="0" Grid.Column="1" x:Name="ChannelText" Margin="5,5,0,5" Height="35"/>
                                 <TextBlock Grid.Row="1" Grid.Column="0" Text="Bot Name:" VerticalAlignment="Center" Margin="0,0,10,0"/>
                                 <TextBox Grid.Row="1" Grid.Column="1" x:Name="BotNameText" Margin="5,5,0,5" Height="35"/>
-                                <TextBlock Text="Broadcaster ID :" Grid.Row="2" Grid.Column="0" Margin="0,24,10,0"/>
-                                <TextBox x:Name="BroadcasterIdText" Text="{Binding BroadcasterId, UpdateSourceTrigger=PropertyChanged}" Grid.Row="2" Grid.Column="1" Margin="5,5,0,5" Height="35"/>
-                                <StackPanel Grid.Row="3" Orientation="Horizontal" Grid.ColumnSpan="2" HorizontalAlignment="Left" Margin="110,5,0,0">
-                                    <Button x:Name="AuthorizeButton" Content="Login with Twitch" Click="AuthWithTwitch_Click" Style="{StaticResource BankButton}" Padding="10,5,10,5" FontSize="12" Margin="5,5,0,5"/>
+                                <TextBlock Text="Broadcaster ID:" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <TextBox x:Name="BroadcasterIdText" Grid.Row="2" Grid.Column="1" Margin="5,5,0,5" Height="35"/>
+                                <StackPanel Grid.Row="3" Orientation="Horizontal" Grid.ColumnSpan="2" HorizontalAlignment="Left" Margin="0,5,0,0">
+                                    <Button x:Name="AuthorizeButton" Content="Login with Twitch" Click="AuthWithTwitch_Click" Style="{StaticResource BankButton}" Padding="10,5" FontSize="12" Margin="5,5,0,5"/>
                                 </StackPanel>
-                                <StackPanel Grid.Row="4" Margin="110,8,-60,10" Orientation="Horizontal" Grid.ColumnSpan="2">
-                                    <Button x:Name="ConnectButton" Content="Connect to Twitch" Click="Connect_Click" Style="{StaticResource BankButton}"  Padding="5,5,5,5" FontSize="12" />
-                                    <Button x:Name="DisconnectButton" Content="Disconnect" Click="Disconnect_Click" Style="{StaticResource BankButton}"  Padding="5,5,5,5" FontSize="12" />
-                                    <TextBlock x:Name="TwitchStatus"   Text="Not connected" Foreground="Red" FontWeight="Bold" RenderTransformOrigin="0.81,1.698" Margin="15,0,0,5" VerticalAlignment="Center"/>
+                                <StackPanel Grid.Row="4" Orientation="Horizontal" Grid.ColumnSpan="2" Margin="0,5,0,0">
+                                    <Button x:Name="ConnectButton" Content="Connect to Twitch" Click="Connect_Click" Style="{StaticResource BankButton}" Padding="5" FontSize="12"/>
+                                    <Button x:Name="DisconnectButton" Content="Disconnect" Click="Disconnect_Click" Style="{StaticResource BankButton}" Padding="5" FontSize="12"/>
+                                    <TextBlock x:Name="TwitchStatus" Text="Not connected" Foreground="Red" FontWeight="Bold" Margin="15,0,0,5" VerticalAlignment="Center"/>
                                 </StackPanel>
-
-
                             </Grid>
+
+                            <!-- ── YouTube Beta (collapsible) ───────────────────────────────── -->
+                            <Border Background="#22FF0000" CornerRadius="12" Margin="0,0,0,14" BorderBrush="#88FF4444" BorderThickness="2">
+                                <Expander IsExpanded="False">
+                                    <Expander.Header>
+                                        <StackPanel Orientation="Horizontal" Margin="4,4,0,4">
+                                            <TextBlock Text="🔴 YouTube Chat  " FontSize="18" FontWeight="Bold" Foreground="#FF6666" VerticalAlignment="Center"/>
+                                            <Border Background="#CC440000" CornerRadius="6" Padding="6,2" VerticalAlignment="Center">
+                                                <TextBlock Text="BETA" FontSize="11" FontWeight="Bold" Foreground="#FF8888"/>
+                                            </Border>
+                                        </StackPanel>
+                                    </Expander.Header>
+                                    <StackPanel Margin="16,0,16,14">
+                                        <TextBlock Text="Read-only. Requires you to be logged in to Google in your browser. Followers-only gate does NOT apply to YouTube viewers."
+                                                   FontSize="12" Foreground="#FFAAAA" TextWrapping="Wrap" Margin="0,8,0,10"/>
+                                        <CheckBox x:Name="YouTubeBetaEnabledCheck"
+                                                  Content="Enable YouTube Beta chat integration"
+                                                  Foreground="#FFF3F3EA"
+                                                  FontWeight="Bold"
+                                                  Checked="YouTubeBetaEnabledCheck_Changed"
+                                                  Unchecked="YouTubeBetaEnabledCheck_Changed"/>
+                                        <StackPanel x:Name="YouTubeBetaPanel" Margin="0,10,0,0" IsEnabled="False">
+                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                                <TextBlock Text="Live Video ID or URL:" VerticalAlignment="Center" Margin="0,0,10,0" Width="160"/>
+                                                <TextBox x:Name="YouTubeVideoIdText" Width="340" Height="34"
+                                                         ToolTip="Paste your YouTube live video URL or bare video ID (e.g. dQw4w9WgXcQ)"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Button Content="Connect YouTube" Click="ConnectYouTube_Click" Style="{StaticResource BankButton}" Padding="10,5" FontSize="12" Margin="0,0,8,0"/>
+                                                <Button Content="Disconnect YouTube" Click="DisconnectYouTube_Click" Style="{StaticResource BankButton}" Padding="10,5" FontSize="12"/>
+                                                <TextBlock x:Name="YouTubeStatus" Text="Not connected" Foreground="#FF8888" FontWeight="Bold" Margin="15,0,0,0" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Expander>
+                            </Border>
+
                         </StackPanel>
-                    </StackPanel>
+                    </ScrollViewer>
                 </TabItem>
+
+                <!-- ═══════════════════════════════════════════════════════════ GIVEAWAY TAB -->
                 <TabItem Header="Giveaway" Style="{StaticResource Gw2TabItemStyle}">
-                    <StackPanel Margin="20">
-                        <!-- Entry Settings -->
-                        <TextBlock Text="Entry Settings" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
-                        <StackPanel Margin="0,0,0,20">
-                            <ComboBox x:Name="EntryModeCombo" SelectedIndex="0" Width="200" HorizontalAlignment="Left" Foreground="Black">
-                                <ComboBoxItem>!Command</ComboBoxItem>
-                                <ComboBoxItem>All Chatters</ComboBoxItem>
-                            </ComboBox>
-                            <TextBox x:Name="EntryCommandText" Margin="4,5,0,0" ToolTip="Command text (e.g. !enter)" Width="200" HorizontalAlignment="Left"/>
-                        </StackPanel>
-                        <TextBlock Text="Entry Period Control" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
-                        <StackPanel Margin="0,0,0,20">
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                                <TextBlock Text="Entry Time (seconds, 0 = unlimited):" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                <TextBox x:Name="EntryTimeText" Text="300" Width="100"/>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="20">
+
+                            <!-- ── Entry Settings ──────────────────────────────────────────── -->
+                            <TextBlock Text="Entry Settings" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
+                            <StackPanel Margin="0,0,0,12">
+                                <ComboBox x:Name="EntryModeCombo" SelectedIndex="0" Width="220" HorizontalAlignment="Left" Foreground="Black" SelectionChanged="EntryModeCombo_SelectionChanged">
+                                    <ComboBoxItem>!Command</ComboBoxItem>
+                                    <ComboBoxItem>Active Users</ComboBoxItem>
+                                    <ComboBoxItem>GW2 Account Name</ComboBoxItem>
+                                </ComboBox>
+                                <TextBox x:Name="EntryCommandText" Margin="4,5,0,0" ToolTip="Command text (e.g. !enter)" Width="200" HorizontalAlignment="Left"/>
                             </StackPanel>
-                            <StackPanel Orientation="Horizontal">
-                                <Button Content="Start Entries" Click="StartEntries_Click" Style="{StaticResource BankButton}" Width="150" Height="40" Margin="0,0,10,0" Padding="5,0,5,0"/>
-                                <Button Content="Stop Entries" Click="StopEntries_Click" Style="{StaticResource BankButton}" Width="150" Height="40" Padding="5,0,5,0"/>
+
+                            <!-- Follower-only + subscriber bonus -->
+                            <Border Background="#33000000" CornerRadius="10" Padding="14,10" Margin="0,0,0,14" BorderBrush="#44FFFFFF" BorderThickness="1">
+                                <StackPanel>
+                                    <CheckBox x:Name="FollowersOnlyCheck" Content="Followers Only (only followers can enter)" IsChecked="False" Foreground="#FFF3F3EA" Checked="FollowersOnlyCheck_Changed" Unchecked="FollowersOnlyCheck_Changed"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                        <TextBlock Text="Subscriber Bonus Entries:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                        <TextBox x:Name="SubBonusEntriesText" Text="1" Width="60" ToolTip="Subscribers get this many entries (1 = no bonus)." TextChanged="SubBonusEntriesText_Changed"/>
+                                        <TextBlock Text="(1 = no bonus)" VerticalAlignment="Center" Margin="8,0,0,0" Foreground="Gray" FontSize="12"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Viewer count -->
+                            <Border Background="#33000000" CornerRadius="10" Padding="14,10" Margin="0,0,0,14" BorderBrush="#44FFFFFF" BorderThickness="1">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Current Twitch Viewers:" FontSize="14" FontWeight="Bold" Foreground="Gold" Margin="0,0,10,0"/>
+                                    <TextBlock x:Name="ViewerCountText" Text="--" FontSize="14" FontWeight="Bold" Foreground="White"/>
+                                    <Button Content="Refresh" Click="RefreshViewerCount_Click" Style="{StaticResource BankButton}" Width="90" Height="28" FontSize="11" Margin="15,0,0,0" Padding="4,0,4,0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Entry Period Control -->
+                            <TextBlock Text="Entry Period Control" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
+                            <StackPanel Margin="0,0,0,12">
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                    <TextBlock Text="Entry Time (seconds, 0 = unlimited):" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <TextBox x:Name="EntryTimeText" Text="300" Width="100"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="Start Entries" Click="StartEntries_Click" Style="{StaticResource BankButton}" Width="150" Height="40" Margin="0,0,10,0" Padding="5,0,5,0"/>
+                                    <Button Content="Stop Entries" Click="StopEntries_Click" Style="{StaticResource BankButton}" Width="150" Height="40" Padding="5,0,5,0"/>
+                                    <Button Click="GenerateTestEntrants_Click" Style="{StaticResource BankButton}" Height="40" Margin="20,0,0,0" Padding="10,0">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBox x:Name="TestEntrantsCountText" Text="20" Width="48" Margin="0,0,8,0" HorizontalContentAlignment="Center" FontSize="15" VerticalContentAlignment="Center"/>
+                                            <TextBlock Text="Generate Test Entrants" VerticalAlignment="Center" FontSize="13"/>
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                                <TextBlock x:Name="EntryStatusText" Text="Entries: Closed" FontSize="16" FontWeight="Bold" Foreground="Red" Margin="0,10,0,0"/>
                             </StackPanel>
-                            <TextBlock x:Name="EntryStatusText" Text="Entries: Closed" FontSize="16" FontWeight="Bold" Foreground="Red" Margin="0,10,0,0"/>
+
+                            <Separator Margin="0,10,0,16" Background="#44FFFFFF"/>
+
+                            <!-- ── Roll Mode ────────────────────────────────────────────────── -->
+                            <TextBlock Text="Giveaway Mode" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
+                            <StackPanel Margin="0,0,0,12">
+                                <ComboBox x:Name="GiveawayModeCombo" SelectedIndex="2" Foreground="Black" Width="500" HorizontalAlignment="Left" Height="32" SelectionChanged="GiveawayModeCombo_SelectionChanged">
+                                    <ComboBoxItem>🏦 Bank Only - Roll directly from prize bank</ComboBoxItem>
+                                    <ComboBoxItem>⭐ Prize Only - Slot wheel with single displayed prize</ComboBoxItem>
+                                    <ComboBoxItem>🎲 Random Pool - Slot wheel with 50/50 random between bank and prize</ComboBoxItem>
+                                </ComboBox>
+
+                                <Border x:Name="RandomPoolPanel" Visibility="Collapsed" Margin="0,16,0,0" Background="#AA1a1a2e" Padding="15" CornerRadius="10" BorderBrush="#666633" BorderThickness="2">
+                                    <StackPanel>
+                                        <TextBlock Text="Random Pool Settings" FontSize="14" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                            <TextBlock Text="🏦 Bank:" VerticalAlignment="Center" Margin="0,0,15,0" Foreground="#6699FF" FontWeight="Bold"/>
+                                            <TextBlock x:Name="BankPercentageText" Text="50%" Foreground="Gold" FontWeight="Bold" Width="50" FontSize="16"/>
+                                            <Slider x:Name="BankPercentageSlider" Minimum="0" Maximum="100" Value="50" Width="260" VerticalAlignment="Center"
+                                                    TickFrequency="1" IsSnapToTickEnabled="True" TickPlacement="BottomRight"
+                                                    ValueChanged="BankPercentageSlider_Changed"/>
+                                            <TextBlock Text="⭐ Prize:" VerticalAlignment="Center" Margin="20,0,0,0" Foreground="#FFDD00" FontWeight="Bold"/>
+                                            <TextBlock x:Name="PrizePercentageText" Text="50%" Foreground="Gold" FontWeight="Bold" Width="50" FontSize="16" Margin="10,0,0,0"/>
+                                        </StackPanel>
+                                        <TextBlock Text="Adjust the odds between Bank and Prize in random mode" FontSize="11" Foreground="Gray"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <CheckBox x:Name="ShowRarityBadgesCheck" Content="Show Prize Rarity Badges in Bank Editor" IsChecked="True" Checked="ShowRarityBadgesCheck_Changed" Unchecked="ShowRarityBadgesCheck_Changed" Margin="0,12,0,0"/>
+                            </StackPanel>
+
+                            <!-- ── Roll Durations ───────────────────────────────────────────── -->
+                            <TextBlock Text="Roll Timing" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,8,0,10"/>
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="20"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Grid.Column="0" Background="#33000000" CornerRadius="10" Padding="14,10" BorderBrush="#44FFFFFF" BorderThickness="1">
+                                    <StackPanel>
+                                        <TextBlock Text="⏱ Slot Wheel Duration" FontSize="14" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,4"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                            <Slider x:Name="SlotRollDurationSlider" Minimum="3" Maximum="30" Value="12" Width="200"
+                                                    TickFrequency="1" IsSnapToTickEnabled="True" TickPlacement="BottomRight"
+                                                    ValueChanged="SlotRollDurationSlider_Changed"/>
+                                            <TextBlock x:Name="SlotRollDurationDisplay" Text="12s" FontSize="16" FontWeight="Bold" Foreground="White" Margin="12,0,0,0" VerticalAlignment="Center" MinWidth="35"/>
+                                        </StackPanel>
+                                        <TextBlock Text="How long the slot wheel spins (3–30s)" FontSize="11" Foreground="Gray" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border Grid.Column="2" Background="#33000000" CornerRadius="10" Padding="14,10" BorderBrush="#44FFFFFF" BorderThickness="1">
+                                    <StackPanel>
+                                        <TextBlock Text="🏦 Bank Pick Duration" FontSize="14" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,4"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                            <Slider x:Name="BankRollDurationSlider" Minimum="2" Maximum="15" Value="5" Width="200"
+                                                    TickFrequency="1" IsSnapToTickEnabled="True" TickPlacement="BottomRight"
+                                                    ValueChanged="BankRollDurationSlider_Changed"/>
+                                            <TextBlock x:Name="BankRollDurationDisplay" Text="5s" FontSize="16" FontWeight="Bold" Foreground="White" Margin="12,0,0,0" VerticalAlignment="Center" MinWidth="35"/>
+                                        </StackPanel>
+                                        <TextBlock Text="Bank highlight bounce duration (2–15s)" FontSize="11" Foreground="Gray" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+
+                            <!-- ── Custom Messages ──────────────────────────────────────────── -->
+                            <TextBlock Text="Custom Messages" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,8,0,10"/>
+                            <StackPanel Margin="0,0,0,12">
+                                <TextBlock Text="Chat Announcement (use {winner}, {prize}, {amount})" Width="600" HorizontalAlignment="Left"/>
+                                <TextBox x:Name="ChatTemplateText" Height="60" AcceptsReturn="True" TextWrapping="Wrap" Width="560" HorizontalAlignment="Left"/>
+                                <TextBlock Text="Winner Screen Prize Text (use {amount}, {prize})" Margin="0,10,0,0" Width="600" HorizontalAlignment="Left"/>
+                                <TextBox x:Name="WinnerPrizeTemplateText" Width="560" HorizontalAlignment="Left"/>
+                            </StackPanel>
+
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,125,20,0" VerticalAlignment="Bottom">
-                            <TextBox x:Name="TestEntrantsCountText" Text="20" Width="80" Margin="0,0,10,0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontSize="28"/>
-                            <Button Content="Generate Test Entrants" Click="GenerateTestEntrants_Click" Style="{StaticResource BankButton}" Width="200" Height="40" Padding="5,0,5,0" VerticalAlignment="Bottom" HorizontalAlignment="Right"/>
-                        </StackPanel>
-                    </StackPanel>
+                    </ScrollViewer>
                 </TabItem>
-                <TabItem Header="Advanced" Style="{StaticResource Gw2TabItemStyle}">
-                    <StackPanel Margin="20">
-                        <TextBlock Text="Channel Point Rewards (Manual Redeem)" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
 
-                        <TextBlock x:Name="ChannelPointsAvailabilityText"
-                                   Text="Checking channel point availability..."
-                                   FontSize="12"
-                                   Foreground="Gray"
-                                   Margin="0,0,0,10"/>
+                <!-- ═══════════════════════════════════════════════════════════ PRIZES TAB -->
+                <TabItem Header="Prizes" Style="{StaticResource Gw2TabItemStyle}">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="20">
+                            <TextBlock Text="Classic Prize Pool" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
+                            <TextBlock Text="One entry per line: gold:500 | item:30684|2 | custom:My Prize|https://icon.url|1"
+                                       FontSize="12" Foreground="Gray" Margin="0,0,0,4"/>
+                            <TextBox x:Name="ClassicPrizePoolText" Height="90" AcceptsReturn="True" TextWrapping="Wrap"
+                                     VerticalScrollBarVisibility="Auto" TextChanged="ClassicPrizePoolText_Changed" Margin="0,0,0,12"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                <Button Content="Add Gold" Click="AddClassicPoolGold_Click" Style="{StaticResource BankButton}" Width="100" Height="34" FontSize="12" Padding="5,0" Margin="0,0,8,0"/>
+                                <Button Content="Add GW2 Item" Click="AddClassicPoolGw2Item_Click" Style="{StaticResource BankButton}" Width="110" Height="34" FontSize="12" Padding="5,0" Margin="0,0,8,0"/>
+                                <Button Content="Add Custom" Click="AddClassicPoolCustom_Click" Style="{StaticResource BankButton}" Width="110" Height="34" FontSize="12" Padding="5,0" Margin="0,0,8,0"/>
+                                <Button Content="Clear Pool" Click="ClearClassicPool_Click" Style="{StaticResource BankButton}" Width="95" Height="34" FontSize="12" Padding="5,0"/>
+                            </StackPanel>
+                            <TextBlock x:Name="ClassicPoolPreviewText" Text="Pool preview" FontSize="16" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,6"/>
+                            <Image x:Name="ClassicPoolPreviewImage" Height="140" Stretch="Uniform" Margin="0,0,0,16"/>
 
-                        <StackPanel x:Name="ChannelPointsControlsPanel">
+                            <Separator Margin="0,0,0,16" Background="#44FFFFFF"/>
 
-                        <TextBlock Text="Configure multiple channel point rewards. Redeem manually below." FontSize="12" Foreground="Gray" Margin="0,0,0,10"/>
+                            <Button x:Name="OpenPrizeBankButton" Content="Open Prize Bank Editor" Click="OpenPrizeBank_Click" Style="{StaticResource BankButton}" Width="Auto" MinWidth="300" Height="60" FontSize="20" Padding="5,0" HorizontalAlignment="Left"/>
+                            <CheckBox x:Name="ShowRarityBadgesCheck2" Content="Show Prize Rarity Badges in Bank Editor" IsChecked="True" Checked="ShowRarityBadgesCheck_Changed" Unchecked="ShowRarityBadgesCheck_Changed" Margin="0,15,0,0"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
 
-                        <!-- List of rewards -->
-                        <ListBox x:Name="ChannelPointRewardsList"
-                 Height="150"
-                 Margin="0,0,0,10"
-                 Width="462"
-                 HorizontalAlignment="Left"
-                 ItemsSource="{Binding ChannelPointRewards, RelativeSource={RelativeSource AncestorType=Window}}">
+                <!-- ═══════════════════════════════════════════════ ENTRANTS &amp; WINNERS TAB -->
+                <TabItem Header="Entrants &amp; Winners" Style="{StaticResource Gw2TabItemStyle}">
+                    <Grid Margin="20">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Entrants -->
+                        <TextBlock Grid.Row="0" Text="Current Entrants" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,8"/>
+                        <ListBox x:Name="EntrantsList" Grid.Row="1" MinHeight="200" MaxHeight="340" Background="#AA000000" Foreground="White" BorderBrush="#FFEFDFDF">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <StackPanel Orientation="Horizontal" Margin="5">
-                                        <TextBlock Text="{Binding Title}" FontWeight="Bold" Foreground="Gold" Margin="0,0,10,0"/>
-                                        <TextBlock Text="{Binding Cost}" Foreground="White"/>
-                                        <TextBlock Text=" points • " Foreground="Gray"/>
-                                        <TextBlock Text="{Binding Action}" Foreground="LightBlue"/>
-                                        <TextBlock Text=" • Gold: " Foreground="Gray" Visibility="{Binding Action, Converter={StaticResource ActionToVisibilityConverter}}"/>
-                                        <TextBlock Text="{Binding InstantGoldAmount}" Foreground="Gold" Visibility="{Binding Action, Converter={StaticResource ActionToVisibilityConverter}}"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding}" Foreground="White"/>
+                                        <TextBlock Text="{Binding Converter={StaticResource Gw2NameConverter}}"
+                                                   Visibility="{Binding Converter={StaticResource Gw2VisibilityConverter}}"
+                                                   Foreground="#00FFAA" FontStyle="Italic"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                            <ListBox.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Add Entrant…" Click="EntrantsContextAdd_Click"/>
+                                    <Separator/>
+                                    <MenuItem Header="Remove Selected" Click="EntrantsContextRemove_Click"/>
+                                    <MenuItem Header="Remove All" Click="EntrantsContextClear_Click"/>
+                                </ContextMenu>
+                            </ListBox.ContextMenu>
+                        </ListBox>
+
+                        <!-- Winners section -->
+                        <TextBlock Grid.Row="2" Text="Winner Chat Messages" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,12,0,4"/>
+                        <TextBlock Grid.Row="3" Text="Messages from the current giveaway winner appear here. Double-click to copy." FontSize="12" Foreground="Gray" Margin="0,0,0,8"/>
+                        <ListBox x:Name="WinnerMessagesList" Grid.Row="4" MinHeight="120" Background="#AA000000" Foreground="White" BorderBrush="#FFEFDFDF"
+                                 MouseDoubleClick="WinnerMessagesList_DoubleClick">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding Sender}" Foreground="#FFCC00" FontWeight="Bold" Margin="0,0,6,0"/>
+                                        <TextBlock Text="{Binding Text}" Foreground="White" TextWrapping="Wrap" MaxWidth="700"/>
                                     </StackPanel>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
-
-                        <!-- Remove selected reward button -->
-                        <Button Content="Remove Selected Reward"
-                Click="RemoveChannelPointReward_Click"
-                Style="{StaticResource BankButton}"
-                Width="200"
-                Height="40"
-                Margin="0,0,0,10"
-                HorizontalAlignment="Left" Padding="5,0,5,0"/>
-
-                        <!-- Add new reward fields -->
-                        <Grid Margin="0,0,0,10">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition/>
-                                <RowDefinition/>
-                                <RowDefinition/>
-                                <RowDefinition/>
-                            </Grid.RowDefinitions>
-
-                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Title:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                            <TextBox Grid.Row="0" Grid.Column="1" x:Name="NewRewardTitleText" Text="My Reward"/>
-
-                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Cost (info):" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                            <TextBox Grid.Row="1" Grid.Column="1" x:Name="NewRewardCostText" Text="100"/>
-
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Action:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                            <ComboBox Grid.Row="2" Grid.Column="1" x:Name="NewRewardActionCombo" Foreground="Black">
-                                <ComboBoxItem>Add to Entrants</ComboBoxItem>
-                                <ComboBoxItem>Instant Bank Roll</ComboBoxItem>
-                                <ComboBoxItem>Instant Gold Win</ComboBoxItem>
-                            </ComboBox>
-
-                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Gold Amount (for Instant Gold):" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                            <TextBox Grid.Row="3" Grid.Column="1" x:Name="NewRewardGoldText" Text="0"/>
-
-                            <Button Grid.Row="0" Grid.RowSpan="4" Grid.Column="2" Content="Add Reward" 
-                    Click="AddChannelPointReward_Click" 
-                    Style="{StaticResource BankButton}" 
-                    Margin="20,0,0,0" 
-                    VerticalAlignment="Center"/>
-                        </Grid>
-
-                        <!-- Manual redeem -->
-                        <Grid Margin="0,20,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-
-                            <ComboBox Grid.Column="0" 
-                      x:Name="RedeemRewardCombo" 
-                      ItemsSource="{Binding ChannelPointRewards, RelativeSource={RelativeSource AncestorType=Window}}" 
-                      DisplayMemberPath="Title" 
-                      Width="250"/>
-
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="20,0,0,0">
-                                <TextBox x:Name="RedeemUsernameText" Width="150"/>
-                                <Button Content="Manual Redeem" Click="ManualRedeem_Click" Style="{StaticResource BankButton}" Margin="10,0,0,0"/>
-                            </StackPanel>
-                        </Grid>
-                        </StackPanel>
-                    </StackPanel>
+                    </Grid>
                 </TabItem>
-                <TabItem Header="Prize/Roll Settings" Style="{StaticResource Gw2TabItemStyle}">
-                    <StackPanel Margin="20">
-                        <!-- Message Templates -->
-                        <TextBlock Text="Custom Messages" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
-                        <StackPanel Margin="0,0,0,20" >
-                            <TextBlock Text="Chat Announcement Template (use {winner}, {prize}, {amount})" Width="462" HorizontalAlignment="Left"/>
-                            <TextBox x:Name="ChatTemplateText" Height="60" AcceptsReturn="True" TextWrapping="Wrap" Width="400" HorizontalAlignment="Left"/>
-                            <TextBlock Text="Winner Screen Prize Text Template (use {amount}, {prize})" Margin="0,10,0,0" Width="462" HorizontalAlignment="Left"/>
-                            <TextBox x:Name="WinnerPrizeTemplateText" Width="400" HorizontalAlignment="Left" />
-                        </StackPanel>
 
-                        <!-- Roll Settings -->
-                        <TextBlock Text="Giveaway Mode" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
-                        <StackPanel Margin="0,0,0,20">
-                            <TextBlock Text="Select how you want winners rolled:" VerticalAlignment="Center" Margin="0,0,0,10"/>
-                            <ComboBox x:Name="GiveawayModeCombo" SelectedIndex="2" Foreground="Black" Width="450" HorizontalAlignment="Left" Height="32" SelectionChanged="GiveawayModeCombo_SelectionChanged">
-                                <ComboBoxItem>🏦 Bank Only - Roll directly from prize bank</ComboBoxItem>
-                                <ComboBoxItem>⭐ Prize Only - Slot wheel with single displayed prize</ComboBoxItem>
-                                <ComboBoxItem>🎲 Random Pool - Slot wheel with 50/50 random between bank and prize</ComboBoxItem>
-                            </ComboBox>
-
-                            <!-- Bank % Slider (only visible for Random Pool mode) -->
-                            <Border x:Name="RandomPoolPanel" Visibility="Collapsed" Margin="0,20,0,0" Background="#AA1a1a2e" Padding="15" CornerRadius="10" BorderBrush="#666633" BorderThickness="2">
-                                <StackPanel>
-                                    <TextBlock Text="Random Pool Settings" FontSize="14" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                                        <TextBlock Text="🏦 Bank:" VerticalAlignment="Center" Margin="0,0,15,0" Foreground="#6699FF" FontWeight="Bold"/>
-                                        <TextBlock x:Name="BankPercentageText" Text="50%" Foreground="Gold" FontWeight="Bold" Width="50" FontSize="16"/>
-                                        <Slider x:Name="BankPercentageSlider" Minimum="0" Maximum="100" Value="50" Width="200" HorizontalAlignment="Left" VerticalAlignment="Center"
-                                                TickFrequency="1" IsSnapToTickEnabled="True" TickPlacement="BottomRight"
-                                                ValueChanged="BankPercentageSlider_Changed"/>
-                                        <TextBlock Text="⭐ Prize:" VerticalAlignment="Center" Margin="20,0,0,0" Foreground="#FFDD00" FontWeight="Bold"/>
-                                        <TextBlock x:Name="PrizePercentageText" Text="50%" Foreground="Gold" FontWeight="Bold" Width="50" FontSize="16" Margin="10,0,0,0"/>
-                                    </StackPanel>
-                                    <TextBlock Text="Adjust the odds between Bank and Prize when random mode is selected" FontSize="11" Foreground="Gray"/>
-                                </StackPanel>
-                            </Border>
-
-                            <CheckBox x:Name="ShowRarityBadgesCheck" Content="Show Prize Rarity Badges in Bank Editor" IsChecked="True" Checked="ShowRarityBadgesCheck_Changed" Unchecked="ShowRarityBadgesCheck_Changed" Margin="0,15,0,0"/>
-
-                            <!-- Slot Wheel Duration -->
-                            <Border Background="#33000000" CornerRadius="10" Padding="14,10" Margin="0,15,0,0" BorderBrush="#44FFFFFF" BorderThickness="1">
-                                <StackPanel>
-                                    <TextBlock Text="⏱ Slot Wheel Roll Duration" FontSize="15" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,4"/>
-                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                        <Slider x:Name="SlotRollDurationSlider" Minimum="3" Maximum="30" Value="12" Width="300"
-                                                TickFrequency="1" IsSnapToTickEnabled="True" TickPlacement="BottomRight"
-                                                ValueChanged="SlotRollDurationSlider_Changed"/>
-                                        <TextBlock x:Name="SlotRollDurationDisplay" Text="12s" FontSize="16" FontWeight="Bold" Foreground="White" Margin="12,0,0,0" VerticalAlignment="Center" MinWidth="35"/>
-                                    </StackPanel>
-                                    <TextBlock Text="How long the slot wheel spins before revealing the winner (3–30 seconds)" FontSize="11" Foreground="Gray" Margin="0,2,0,0"/>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- Bank Roll Duration -->
-                            <Border Background="#33000000" CornerRadius="10" Padding="14,10" Margin="0,10,0,0" BorderBrush="#44FFFFFF" BorderThickness="1">
-                                <StackPanel>
-                                    <TextBlock Text="🏦 Bank Prize Pick Duration" FontSize="15" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,4"/>
-                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                        <Slider x:Name="BankRollDurationSlider" Minimum="2" Maximum="15" Value="5" Width="300"
-                                                TickFrequency="1" IsSnapToTickEnabled="True" TickPlacement="BottomRight"
-                                                ValueChanged="BankRollDurationSlider_Changed"/>
-                                        <TextBlock x:Name="BankRollDurationDisplay" Text="5s" FontSize="16" FontWeight="Bold" Foreground="White" Margin="12,0,0,0" VerticalAlignment="Center" MinWidth="35"/>
-                                    </StackPanel>
-                                    <TextBlock Text="How long the bank highlight bounces between slots before landing (2–15 seconds)" FontSize="11" Foreground="Gray" Margin="0,2,0,0"/>
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
-                    </StackPanel>
-                </TabItem>
-                <TabItem Header="Prize/Entrants" Style="{StaticResource Gw2TabItemStyle}">
-                    <StackPanel Margin="20">
-                        <TextBlock Text="Classic Prize Pool" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,10"/>
-                        <TextBlock Text="Classic pool entries (one per line): gold:500 | item:30684|2 | custom:My Prize|https://icon.url|1"
-                                   FontSize="12"
-                                   Foreground="Gray"
-                                   Margin="0,0,0,4"/>
-                        <TextBox x:Name="ClassicPrizePoolText"
-                                 Height="90"
-                                 AcceptsReturn="True"
-                                 TextWrapping="Wrap"
-                                 VerticalScrollBarVisibility="Auto"
-                                 TextChanged="ClassicPrizePoolText_Changed"
-                                 Margin="0,0,0,16"/>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                            <Button Content="Add Gold" Click="AddClassicPoolGold_Click" Style="{StaticResource BankButton}" Width="100" Height="34" FontSize="12" Padding="5,0,5,0" Margin="0,0,8,0"/>
-                            <Button Content="Add GW2 Item" Click="AddClassicPoolGw2Item_Click" Style="{StaticResource BankButton}" Width="110" Height="34" FontSize="12" Padding="5,0,5,0" Margin="0,0,8,0"/>
-                            <Button Content="Add Custom" Click="AddClassicPoolCustom_Click" Style="{StaticResource BankButton}" Width="110" Height="34" FontSize="12" Padding="5,0,5,0" Margin="0,0,8,0"/>
-                            <Button Content="Clear Pool" Click="ClearClassicPool_Click" Style="{StaticResource BankButton}" Width="95" Height="34" FontSize="12" Padding="5,0,5,0"/>
-                        </StackPanel>
-
-                        <TextBlock x:Name="ClassicPoolPreviewText" Text="Pool preview" FontSize="16" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,6"/>
-                        <Image x:Name="ClassicPoolPreviewImage" Height="140" Stretch="Uniform" Margin="0,0,0,16"/>
-
-                        <!-- Bank -->
-                        <Button x:Name="OpenPrizeBankButton" Content="Open Prize Bank Editor" Click="OpenPrizeBank_Click" Style="{StaticResource BankButton}" Width="Auto" MinWidth="300" Height="60" FontSize="20" Padding="5,0,5,0"/>
-
-
-
-                    </StackPanel>
-                </TabItem>
-                <TabItem Header="Entrants" Style="{StaticResource Gw2TabItemStyle}">
-                    <StackPanel Margin="20">
-                        <!-- Entrants -->
-                        <TextBlock Text="Current Entrants" FontSize="20" FontWeight="Bold" Foreground="Gold" Margin="0,20,0,10"/>
-                        <ListBox x:Name="EntrantsList" Height="464" Background="#AA000000" Foreground="White" BorderBrush="#FFEFDFDF">
-                            <ListBox.ContextMenu>
-                                <ContextMenu Background="#EE1a1a2e" Foreground="#FFF3F3EA" BorderBrush="#FFEFDFDF" BorderThickness="2">
-                                    <MenuItem Header="Add Entrant…" Click="EntrantsContextAdd_Click" Foreground="#FFF3F3EA" FontSize="14"/>
-                                    <Separator Background="#44FFFFFF" Margin="4,2"/>
-                                    <MenuItem Header="Remove Selected" Click="EntrantsContextRemove_Click" Foreground="#FFF3F3EA" FontSize="14"/>
-                                    <MenuItem Header="Remove All" Click="EntrantsContextClear_Click" Foreground="#FFF3F3EA" FontSize="14"/>
-                                </ContextMenu>
-                            </ListBox.ContextMenu>
-                        </ListBox>
-                    </StackPanel>
-                </TabItem>
+                <!-- ═══════════════════════════════════════════════════════════ TRIVIA TAB -->
                 <TabItem Header="Trivia-Tron" Style="{StaticResource Gw2TabItemStyle}">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel Margin="20">
@@ -501,98 +488,196 @@ FontSize="12" Padding="0,0,0,0" HorizontalAlignment="Left" Margin="0,0,8,8"/>
                                     <TextBlock Text="Twitch Status:" FontSize="18" FontWeight="Bold"/>
                                     <TextBlock Text="{Binding Trivia.ConnectionStatus}" Foreground="Gold" FontSize="16" Margin="0,0,0,20"/>
                                 </StackPanel>
-
                                 <StackPanel Orientation="Horizontal">
                                     <CheckBox Content="Trivia-Tron Active (Online/Offline)"
-IsChecked="{Binding Trivia.IsTriviaEnabled}"
-FontSize="16"
-HorizontalAlignment="Center"
-Margin="0,0,0,20"/>
-
-                                    <TextBlock Text="{Binding Trivia.TriviaStatus}"
- FontSize="16"
- FontWeight="Bold"
- Foreground="Gold"
- HorizontalAlignment="Center"
- Margin="0,0,0,20"/>
+                                              IsChecked="{Binding Trivia.IsTriviaEnabled}"
+                                              FontSize="16"
+                                              HorizontalAlignment="Center"
+                                              Margin="0,0,0,20"/>
                                 </StackPanel>
-
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Score:" FontSize="18" FontWeight="Bold"/>
+                                    <TextBlock Text="{Binding Trivia.ScoreDisplay}" Foreground="Gold" FontSize="16" Margin="0,0,0,20"/>
+                                </StackPanel>
+                                <TextBlock Text="{Binding Trivia.TriviaStatus}"
+                                           FontSize="16" FontWeight="Bold" Foreground="Gold"
+                                           HorizontalAlignment="Center" Margin="0,0,0,20"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                 <TextBlock Text="Category:" VerticalAlignment="Center" Margin="0,0,10,0"/>
                                 <ComboBox ItemsSource="{Binding Trivia.Categories}"
-          SelectedItem="{Binding Trivia.SelectedCategory}" 
-                          Width="200" Foreground="Black"/>
+                                          SelectedItem="{Binding Trivia.SelectedCategory}"
+                                          Width="200" Foreground="Black"/>
                             </StackPanel>
-
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                 <TextBlock Text="Answer Time (seconds):" VerticalAlignment="Center" Margin="0,0,10,0"/>
                                 <TextBox Text="{Binding Trivia.AnswerTimeSeconds}" Width="100"/>
                             </StackPanel>
-
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
                                 <Button Content="Start Trivia" Command="{Binding Trivia.StartTriviaCommand}" Style="{StaticResource BankButton}" Width="150" Margin="0,0,10,0" Height="50"/>
                                 <Button Content="Stop Trivia" Command="{Binding Trivia.StopTriviaCommand}" Style="{StaticResource BankButton}" Width="150"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                 <Button x:Name="ShowTriviaOverlayButton" Content="Show Trivia Overlay" Click="ShowTriviaOverlay_Click" Style="{StaticResource BankButton}" Width="Auto" MinWidth="250" Height="50" FontSize="18"/>
-                                <Button Content="Setting" Click="OpenTriviaSettings_Click" Style="{StaticResource BankButton}" Width="150" Height="50" />
+                                <Button Content="Setting" Click="OpenTriviaSettings_Click" Style="{StaticResource BankButton}" Width="150" Height="50"/>
                             </StackPanel>
-
                             <TextBlock Text="{Binding Trivia.CurrentQuestion}" FontSize="20" TextWrapping="Wrap" Margin="0,20,0,0"/>
                             <TextBlock Text="{Binding Trivia.TimeLeft}" FontSize="30" Foreground="Red" FontWeight="Bold" HorizontalAlignment="Center"/>
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>
-                <TabItem Header="Data Management" Style="{StaticResource Gw2TabItemStyle}">
+
+                <!-- ═══════════════════════════════════════════════════════════ TOOLS TAB -->
+                <TabItem Header="Tools" Style="{StaticResource Gw2TabItemStyle}">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel Margin="20">
-                            <TextBlock Text="Trivia Data" FontSize="22" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,12"/>
-                            <TextBlock Text="Lookup and manage saved IQ points for chat users." Foreground="Gray" FontSize="12" Margin="0,0,0,10"/>
 
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                                <TextBox x:Name="DataViewerSearchText" Width="280" Height="32" ToolTip="Search username"/>
-                                <Button Content="Search" Click="DataSearch_Click" Style="{StaticResource BankButton}" Width="100" Height="32" FontSize="12" Padding="4,0,4,0"/>
-                                <Button Content="Refresh" Click="DataRefresh_Click" Style="{StaticResource BankButton}" Width="100" Height="32" FontSize="12" Padding="4,0,4,0"/>
-                            </StackPanel>
+                            <!-- Channel Point Rewards -->
+                            <Expander Header="🎯 Channel Point Rewards (Manual Redeem)" IsExpanded="True" Foreground="Gold" FontSize="18" FontWeight="Bold" Margin="0,0,0,10">
+                                <StackPanel Margin="0,10,0,0">
+                                    <TextBlock x:Name="ChannelPointsAvailabilityText" Text="Checking channel point availability…" FontSize="12" Foreground="Gray" Margin="0,0,0,10"/>
+                                    <StackPanel x:Name="ChannelPointsControlsPanel">
+                                        <TextBlock Text="Configure multiple channel point rewards. Redeem manually below." FontSize="12" Foreground="Gray" Margin="0,0,0,10"/>
+                                        <ListBox x:Name="ChannelPointRewardsList" Height="150" Margin="0,0,0,10" Width="600" HorizontalAlignment="Left"
+                                                 ItemsSource="{Binding ChannelPointRewards, RelativeSource={RelativeSource AncestorType=Window}}">
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Orientation="Horizontal" Margin="5">
+                                                        <TextBlock Text="{Binding Title}" FontWeight="Bold" Foreground="Gold" Margin="0,0,10,0"/>
+                                                        <TextBlock Text="{Binding Cost}" Foreground="White"/>
+                                                        <TextBlock Text=" points • " Foreground="Gray"/>
+                                                        <TextBlock Text="{Binding Action}" Foreground="LightBlue"/>
+                                                        <TextBlock Text=" • Gold: " Foreground="Gray" Visibility="{Binding Action, Converter={StaticResource ActionToVisibilityConverter}}"/>
+                                                        <TextBlock Text="{Binding InstantGoldAmount}" Foreground="Gold" Visibility="{Binding Action, Converter={StaticResource ActionToVisibilityConverter}}"/>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                        <Button Content="Remove Selected Reward" Click="RemoveChannelPointReward_Click" Style="{StaticResource BankButton}" Width="200" Height="40" Margin="0,0,0,10" HorizontalAlignment="Left" Padding="5,0"/>
+                                        <Grid Margin="0,0,0,10" Width="600" HorizontalAlignment="Left">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition/>
+                                                <RowDefinition/>
+                                                <RowDefinition/>
+                                                <RowDefinition/>
+                                            </Grid.RowDefinitions>
+                                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Title:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                            <TextBox Grid.Row="0" Grid.Column="1" x:Name="NewRewardTitleText" Text="My Reward"/>
+                                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Cost (info):" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                            <TextBox Grid.Row="1" Grid.Column="1" x:Name="NewRewardCostText" Text="100"/>
+                                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Action:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                            <ComboBox Grid.Row="2" Grid.Column="1" x:Name="NewRewardActionCombo" Foreground="Black">
+                                                <ComboBoxItem>Add to Entrants</ComboBoxItem>
+                                                <ComboBoxItem>Instant Bank Roll</ComboBoxItem>
+                                                <ComboBoxItem>Instant Gold Win</ComboBoxItem>
+                                            </ComboBox>
+                                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Gold Amount (Instant Gold):" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                            <TextBox Grid.Row="3" Grid.Column="1" x:Name="NewRewardGoldText" Text="0"/>
+                                            <Button Grid.Row="0" Grid.RowSpan="4" Grid.Column="2" Content="Add Reward" Click="AddChannelPointReward_Click" Style="{StaticResource BankButton}" Margin="20,0,0,0" VerticalAlignment="Center"/>
+                                        </Grid>
+                                        <Grid Margin="0,12,0,0" Width="600" HorizontalAlignment="Left">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <ComboBox Grid.Column="0" x:Name="RedeemRewardCombo"
+                                                      ItemsSource="{Binding ChannelPointRewards, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                      DisplayMemberPath="Title" Width="250"/>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="20,0,0,0">
+                                                <TextBox x:Name="RedeemUsernameText" Width="150"/>
+                                                <Button Content="Manual Redeem" Click="ManualRedeem_Click" Style="{StaticResource BankButton}" Margin="10,0,0,0"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Expander>
 
-                            <ListView x:Name="DataViewersList" Height="160" Margin="0,0,0,10" Background="#AA000000" Foreground="White" BorderBrush="#FFEFDFDF">
-                                <ListView.View>
-                                    <GridView>
-                                        <GridViewColumn Header="Username" Width="260" DisplayMemberBinding="{Binding Username}"/>
-                                        <GridViewColumn Header="IQ" Width="120" DisplayMemberBinding="{Binding Iq}"/>
-                                    </GridView>
-                                </ListView.View>
-                            </ListView>
+                            <Separator Margin="0,10,0,14" Background="#44FFFFFF"/>
 
-                            <TextBlock Text="Giveaway Winner History" FontSize="18" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,8"/>
-                            <ListView x:Name="DataHistoryList" Height="170" Margin="0,0,0,10" Background="#AA000000" Foreground="White" BorderBrush="#FFEFDFDF">
-                                <ListView.View>
-                                    <GridView>
-                                        <GridViewColumn Header="Date" Width="150" DisplayMemberBinding="{Binding Date}"/>
-                                        <GridViewColumn Header="Winner" Width="120" DisplayMemberBinding="{Binding Winner}"/>
-                                        <GridViewColumn Header="Prize" Width="190" DisplayMemberBinding="{Binding Prize}"/>
-                                        <GridViewColumn Header="Source" Width="120" DisplayMemberBinding="{Binding Source}"/>
-                                    </GridView>
-                                </ListView.View>
-                            </ListView>
+                            <!-- Trivia Data -->
+                            <Expander Header="📊 Trivia-Tron Data" IsExpanded="False" Foreground="Gold" FontSize="18" FontWeight="Bold" Margin="0,0,0,10">
+                                <StackPanel Margin="0,8,0,0">
+                                    <TextBlock Text="Lookup and manage saved IQ points for chat users." Foreground="Gray" FontSize="12" Margin="0,0,0,10"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                        <TextBox x:Name="DataTriviaSearchText" Width="280" Height="32" ToolTip="Search trivia username"/>
+                                        <Button Content="Search Trivia" Click="DataTriviaSearch_Click" Style="{StaticResource BankButton}" Width="120" Height="32" FontSize="12" Padding="4,0"/>
+                                        <Button Content="Refresh Trivia" Click="DataTriviaRefresh_Click" Style="{StaticResource BankButton}" Width="120" Height="32" FontSize="12" Padding="4,0"/>
+                                    </StackPanel>
+                                    <ListView x:Name="DataViewersList" Height="160" Margin="0,0,0,10" Background="#AA000000" Foreground="White" BorderBrush="#FFEFDFDF">
+                                        <ListView.View>
+                                            <GridView>
+                                                <GridViewColumn Header="Username" Width="260" DisplayMemberBinding="{Binding Username}"/>
+                                                <GridViewColumn Header="IQ" Width="120" DisplayMemberBinding="{Binding Iq}"/>
+                                            </GridView>
+                                        </ListView.View>
+                                    </ListView>
+                                    <Button Content="Clear Trivia Data" Click="DataClearTrivia_Click" Style="{StaticResource BankButton}" Width="150" Height="34" FontSize="12" Padding="4,0" HorizontalAlignment="Left"/>
+                                </StackPanel>
+                            </Expander>
 
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                                <TextBlock x:Name="DataStatusText" Text="Loaded 0 records" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                <Button Content="Clear Trivia + History" Click="DataClearAll_Click" Style="{StaticResource BankButton}" Width="170" Height="34" FontSize="12" Padding="4,0,4,0"/>
-                            </StackPanel>
+                            <!-- Giveaway History -->
+                            <Expander Header="🏆 Giveaway Winner History" IsExpanded="False" Foreground="Gold" FontSize="18" FontWeight="Bold" Margin="0,0,0,16">
+                                <StackPanel Margin="0,8,0,0">
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                        <TextBox x:Name="DataHistorySearchText" Width="280" Height="32" ToolTip="Search winner, prize, or source"/>
+                                        <Button Content="Search Winners" Click="DataHistorySearch_Click" Style="{StaticResource BankButton}" Width="120" Height="32" FontSize="12" Padding="4,0"/>
+                                        <Button Content="Refresh Winners" Click="DataHistoryRefresh_Click" Style="{StaticResource BankButton}" Width="120" Height="32" FontSize="12" Padding="4,0"/>
+                                    </StackPanel>
+                                    <ListView x:Name="DataHistoryList" Height="170" Margin="0,0,0,10" Background="#AA000000" Foreground="White" BorderBrush="#FFEFDFDF">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="Foreground" Value="#FFF3F3EA"/>
+                                                <Setter Property="Background" Value="Transparent"/>
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                                <Style.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background" Value="#33FFD700"/>
+                                                        <Setter Property="Foreground" Value="#FFF3F3EA"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsSelected" Value="True">
+                                                        <Setter Property="Background" Value="#66B8860B"/>
+                                                        <Setter Property="Foreground" Value="#FFF3F3EA"/>
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
+                                        <ListView.View>
+                                            <GridView>
+                                                <GridViewColumn Header="Date" Width="150" DisplayMemberBinding="{Binding Date}"/>
+                                                <GridViewColumn Header="Winner" Width="148" DisplayMemberBinding="{Binding Winner}"/>
+                                                <GridViewColumn Header="Prize" Width="220" DisplayMemberBinding="{Binding Prize}"/>
+                                                <GridViewColumn Header="Source" Width="140" DisplayMemberBinding="{Binding Source}"/>
+                                            </GridView>
+                                        </ListView.View>
+                                    </ListView>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button Content="Clear Winner History" Click="DataClearHistory_Click" Style="{StaticResource BankButton}" Width="160" Height="34" FontSize="12" Padding="4,0"/>
+                                        <Button Content="Clear Current Entrants" Click="ClearEntrants_Click" Style="{StaticResource BankButton}" Width="170" Height="34" FontSize="12" Padding="4,0"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Expander>
 
-                            <Separator Margin="0,8,0,12"/>
+                            <TextBlock x:Name="DataStatusText" Text="Loaded 0 records" VerticalAlignment="Center" Margin="0,0,12,16"/>
 
-                            <TextBlock Text="Backup / Restore" FontSize="22" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,12"/>
+                            <Separator Margin="0,8,0,12" Background="#44FFFFFF"/>
+
+                            <!-- Backup / Restore -->
+                            <TextBlock Text="💾 Backup / Restore" FontSize="22" FontWeight="Bold" Foreground="Gold" Margin="0,0,0,12"/>
                             <TextBlock Text="Export includes settings, giveaway history, prize bank, logs, and trivia DB. Import restores from a backup zip." Foreground="Gray" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,10"/>
                             <StackPanel Orientation="Horizontal">
-                                <Button Content="Export App Backup" Click="ExportAppBackup_Click" Style="{StaticResource BankButton}" Width="160" Height="40" FontSize="12" Padding="4,0,4,0"/>
-                                <Button Content="Import App Backup" Click="ImportAppBackup_Click" Style="{StaticResource BankButton}" Width="160" Height="40" FontSize="12" Padding="4,0,4,0"/>
+                                <Button Content="Export App Backup" Click="ExportAppBackup_Click" Style="{StaticResource BankButton}" Width="160" Height="40" FontSize="12" Padding="4,0"/>
+                                <Button Content="Import App Backup" Click="ImportAppBackup_Click" Style="{StaticResource BankButton}" Width="160" Height="40" FontSize="12" Padding="4,0"/>
                             </StackPanel>
+
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>
+
             </TabControl>
 
             <!-- Bottom buttons -->
@@ -604,3 +689,4 @@ Margin="0,0,0,20"/>
         </Grid>
     </Border>
 </Window>
+

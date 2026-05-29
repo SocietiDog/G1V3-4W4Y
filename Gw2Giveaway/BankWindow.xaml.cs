@@ -14,13 +14,60 @@ namespace Gw2Giveaway
         private SlotViewModel _currentHighlightedSlot;
         public bool ShowPrizeRarityBadges { get; set; } = true;
         
+        private PrizeBank _bank;
+
         public BankWindow(PrizeBank bank, Action saveCallback, bool showRarityBadges = true)
         {
             InitializeComponent();
             ShowPrizeRarityBadges = showRarityBadges;
             _saveCallback = saveCallback;
-            var vm = new BankViewModel(bank, _saveCallback, showRarityBadges);
+            _bank = bank;
+            var vm = CreateViewModel(bank, showRarityBadges);
             DataContext = vm;
+
+            // Apply the correct grid dimensions once the visual tree is ready
+            Loaded += (_, _) => ApplyGridDimensions(_bank.Rows, _bank.Cols);
+        }
+
+        private BankViewModel CreateViewModel(PrizeBank bank, bool showRarityBadges)
+        {
+            return new BankViewModel(bank, _saveCallback, showRarityBadges, onResize: (rows, cols) =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    // Rebuild ViewModel with new grid dimensions
+                    DataContext = CreateViewModel(_bank, ShowPrizeRarityBadges);
+                    // Defer grid dimension update until after the new panel is measured/arranged
+                    Dispatcher.InvokeAsync(() => ApplyGridDimensions(rows, cols),
+                        System.Windows.Threading.DispatcherPriority.Loaded);
+                });
+            });
+        }
+
+        private void ApplyGridDimensions(int rows, int cols)
+        {
+            // Walk the visual tree to find the UniformGrid inside the ItemsControl
+            SlotsItemsControl.ApplyTemplate();
+            var panel = SlotsItemsControl.ItemsPanel;
+            if (FindUniformGrid(SlotsItemsControl) is System.Windows.Controls.Primitives.UniformGrid ug)
+            {
+                ug.Rows = rows;
+                ug.Columns = cols;
+            }
+        }
+
+        private static System.Windows.Controls.Primitives.UniformGrid? FindUniformGrid(DependencyObject parent)
+        {
+            if (parent == null) return null;
+            int count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent);
+            for (int i = 0; i < count; i++)
+            {
+                var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, i);
+                if (child is System.Windows.Controls.Primitives.UniformGrid ug) return ug;
+                var result = FindUniformGrid(child);
+                if (result != null) return result;
+            }
+            return null;
         }
 
         private void CloseApp_Click(object sender, RoutedEventArgs e)
@@ -151,7 +198,7 @@ namespace Gw2Giveaway
                     _currentHighlightedSlot.IsHighlighted = false;
                 }
 
-                var winningSlot = vm.Slots[win.Row * 10 + win.Col];
+                var winningSlot = vm.Slots[win.Row * vm.GridCols + win.Col];
                 winningSlot.IsHighlighted = true;
                 _currentHighlightedSlot = winningSlot;
 

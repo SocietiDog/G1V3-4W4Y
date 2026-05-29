@@ -4,6 +4,9 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
+	  <Version>1.0.7</Version>
+	  <AssemblyVersion>1.0.6.0</AssemblyVersion>
+	  <FileVersion>1.0.7.0</FileVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -34,9 +37,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.5" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3296.44" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-    <PackageReference Include="PixiEditor.ColorPicker" Version="3.4.2.2" />
+    <PackageReference Include="PixiEditor.ColorPicker" Version="3.4.2.3" />
     <PackageReference Include="TwitchLib.Api" Version="3.10.2" />
     <PackageReference Include="TwitchLib.Client" Version="4.0.1" />
     <PackageReference Include="TwitchLib.EventSub.Websockets" Version="0.8.0" />

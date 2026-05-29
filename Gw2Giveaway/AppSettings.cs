@@ -7,8 +7,9 @@ namespace Gw2Giveaway
     public enum EntryMode
     {
         Command,
-        AllChatters,
-        ChannelPointManual  // Real PubSub later – manual add for now
+        ActiveUsers,
+        Gw2Account,          // Players type their GW2 account name (e.g. Name.1234) to enter
+        ChannelPointManual   // Real PubSub later – manual add for now
     }
 
     public enum GiveawayMode
@@ -36,13 +37,15 @@ namespace Gw2Giveaway
         public GiveawayMode CurrentGiveawayMode { get; set; } = GiveawayMode.RandomPool;
         public int RandomPoolBankPercentage { get; set; } = 50;  // 0-100% for bank vs prize in random mode
         public bool ShowPrizeRarityBadges { get; set; } = true;
-        public string ClassicPrizeName { get; set; } = "Legendary Weapon";
+        public string ClassicPrizeName { get; set; } = "";
         public string ClassicPrizeIconUrl { get; set; } = "";
         public bool ClassicUsePrizePool { get; set; } = false;
         public string ClassicPrizePool { get; set; } = "";
         public ObservableCollection<ChannelPointReward> ChannelPointRewards { get; set; } = new();
         public int SlotRollDurationSeconds { get; set; } = 12;  // Default: 12 seconds
         public int BankRollDurationSeconds { get; set; } = 5;   // Default: 5 seconds for bank highlight animation
+        public int BankRows { get; set; } = 3;
+        public int BankColumns { get; set; } = 10;
         public bool AutoOpenOverlay { get; set; } = false;
         public double? OverlayLeft { get; set; }
         public double? OverlayTop { get; set; }
@@ -56,6 +59,14 @@ namespace Gw2Giveaway
         public double? PrizeBankTop { get; set; }
         public double? PrizeBankWidth { get; set; }
         public double? PrizeBankHeight { get; set; }
+        public double? MainWindowLeft { get; set; }
+        public double? MainWindowTop { get; set; }
+        public double? MainWindowWidth { get; set; }
+        public double? MainWindowHeight { get; set; }
+        public double? TriviaSettingsLeft { get; set; }
+        public double? TriviaSettingsTop { get; set; }
+        public double? TriviaSettingsWidth { get; set; }
+        public double? TriviaSettingsHeight { get; set; }
         public string OverlayBackground { get; set; } = "#DD000000";
         public string OverlayInnerBackground { get; set; } = "#EE000000";
         public string OverlayBorderColor { get; set; } = "#FFD700";
@@ -69,8 +80,17 @@ namespace Gw2Giveaway
         public bool DisclaimerAccepted { get; set; } = false;
         public int DisclaimerAcceptedVersion { get; set; } = 0;
 
+        public bool FollowersOnly { get; set; } = false;
+        public int SubscriberBonusEntries { get; set; } = 1;  // 1 = no bonus; subs get this many entries
+
         // Optional: Add BroadcasterId here too for channel points
         public string BroadcasterId { get; set; } = "";
+
+        // ── YouTube Beta (optional, can be disabled if not streaming on YT) ─────
+        public bool YouTubeBetaEnabled { get; set; } = false;
+        /// <summary>Full YouTube watch URL or bare 11-char video ID for the live stream.</summary>
+        public string YouTubeVideoId { get; set; } = "";
+        // ─────────────────────────────────────────────────────────────────────────
 
         public ObservableCollection<GiveawayHistoryEntry> GiveawayHistory { get; set; } = new();
 

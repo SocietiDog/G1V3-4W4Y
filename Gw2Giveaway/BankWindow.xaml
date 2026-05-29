@@ -42,34 +42,6 @@ WindowStartupLocation="Manual">
             </Setter>
         </Style>
 
-        <!-- Dark themed ContextMenu style -->
-        <Style TargetType="ContextMenu">
-            <Setter Property="Background" Value="#EE1a1a2e"/>
-            <Setter Property="Foreground" Value="#FFF3F3EA"/>
-            <Setter Property="BorderBrush" Value="#FFEFDFDF"/>
-            <Setter Property="BorderThickness" Value="2"/>
-            <Setter Property="Padding" Value="4"/>
-            <Setter Property="HasDropShadow" Value="True"/>
-        </Style>
-
-        <Style TargetType="MenuItem">
-            <Setter Property="Foreground" Value="#FFF3F3EA"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Padding" Value="10,6"/>
-            <Style.Triggers>
-                <Trigger Property="IsHighlighted" Value="True">
-                    <Setter Property="Background" Value="#33FFD700"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style TargetType="Separator">
-            <Setter Property="Background" Value="#44FFFFFF"/>
-            <Setter Property="Margin" Value="4,2"/>
-        </Style>
-
-
     </Window.Resources>
 
     <Border CornerRadius="10" BorderThickness="4" Padding="20" BorderBrush="#FFEFDFDF" MouseLeftButtonDown="Window_MouseLeftButtonDown">
@@ -89,15 +61,18 @@ WindowStartupLocation="Manual">
 
             <!-- Title bar buttons (top-right) -->
             <StackPanel Orientation="Horizontal" Margin="0,10,10,0" HorizontalAlignment="Right" Grid.Row="0">
+                <Button Content="⚙ Grid Size" Style="{StaticResource BankButton}" Command="{Binding ResizeGridCommand}"
+                        FontSize="14" Width="100" Height="45" Margin="5" Foreground="#FFF3F3EA" ToolTip="Change the number of rows and columns in the prize grid"/>
                 <Button Content="−" Style="{StaticResource BankButton}" Click="MinimizeWindow_Click" FontSize="25" FontWeight="Bold" Width="45" Height="45" Margin="5" Padding="0,10,0,0" Foreground="#FFF3F3EA" />
                 <Button Content="X" Style="{StaticResource BankButton}" Width="45" Height="45" Click="CloseApp_Click" Margin="5" Padding="0,0,0,0" FontSize="30" VerticalContentAlignment="Center" Foreground="#FFF3F3EA"/>
             </StackPanel>
 
-            <!-- Slots grid -->
-            <ItemsControl ItemsSource="{Binding Slots}" Grid.Row="1" Margin="25" BorderThickness="1" BorderBrush="#FFF3F3EA">
+            <!-- Slots grid (wraps in Viewbox so the grid scales when window is resized) -->
+            <Viewbox Grid.Row="1" Stretch="Uniform" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+            <ItemsControl x:Name="SlotsItemsControl" ItemsSource="{Binding Slots}" Margin="25" BorderThickness="1" BorderBrush="#FFF3F3EA">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
-                        <UniformGrid Rows="3" Columns="10"/>
+                        <UniformGrid x:Name="SlotsUniformGrid" Rows="3" Columns="10"/>
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
@@ -228,6 +203,7 @@ WindowStartupLocation="Manual">
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+            </Viewbox>
 
             <!-- Gold Row -->
             <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,25,20">

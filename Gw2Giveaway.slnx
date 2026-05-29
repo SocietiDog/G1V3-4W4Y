@@ -1,3 +1,6 @@
 <Solution>
+  <Project Path="G1V3 -4W4Y Installer/G1V3 -4W4Y Installer.vdproj" Type="Installer">
+    <Build />
+  </Project>
   <Project Path="Gw2Giveaway/Gw2Giveaway.csproj" />
 </Solution>

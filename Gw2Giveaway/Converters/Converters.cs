@@ -239,4 +239,35 @@ namespace Gw2Giveaway.Converters
             throw new NotImplementedException();
         }
     }
+    public class TwitchNameToGw2NameConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is string twitchName && MainWindow.Instance != null)
+            {
+                string gw2 = MainWindow.Instance.GetGw2AccountName(twitchName);
+                return string.IsNullOrEmpty(gw2) ? string.Empty : $"  [{gw2}]";
+            }
+            return string.Empty;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            => throw new NotImplementedException();
+    }
+
+    public class TwitchNameToGw2VisibilityConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is string twitchName && MainWindow.Instance != null)
+            {
+                string gw2 = MainWindow.Instance.GetGw2AccountName(twitchName);
+                return string.IsNullOrEmpty(gw2) ? Visibility.Collapsed : Visibility.Visible;
+            }
+            return Visibility.Collapsed;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            => throw new NotImplementedException();
+    }
 }

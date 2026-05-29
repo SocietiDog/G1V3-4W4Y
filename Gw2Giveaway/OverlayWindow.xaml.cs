@@ -18,9 +18,93 @@ namespace Gw2Giveaway
         private int _slotRunId = 0; // Track slot machine runs
         private DispatcherTimer? _winnerPrizeCarouselTimer;
         private DispatcherTimer? _prizePreviewCarouselTimer;
+        private DispatcherTimer? _countdownTimer;
+        private int _countdownSeconds;
 
         // Callback for when winner is revealed: passes (winnerName, isFromBank)
         public Action<string, bool>? OnSlotWinnerRevealed { get; set; }
+
+        /// <summary>Start or refresh the entry countdown on the overlay.</summary>
+        public void StartCountdown(int totalSeconds, int currentEntrants)
+        {
+            _countdownSeconds = totalSeconds;
+            CountdownPanel.Visibility = Visibility.Visible;
+            UpdateCountdownDisplay(currentEntrants);
+
+            _countdownTimer?.Stop();
+
+            if (totalSeconds <= 0)
+            {
+                CountdownLabel.Text = "Entries open!";
+                CountdownText.Text = "∞";
+                return;
+            }
+
+            _countdownTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            _countdownTimer.Tick += (_, __) =>
+            {
+                _countdownSeconds--;
+                if (_countdownSeconds <= 0)
+                {
+                    _countdownTimer?.Stop();
+                    CountdownText.Text = "CLOSED";
+                    CountdownText.Foreground = new SolidColorBrush(Colors.OrangeRed);
+                    CountdownLabel.Text = "Entries closed";
+                }
+                else
+                {
+                    UpdateCountdownDisplay();
+                }
+            };
+            _countdownTimer.Start();
+        }
+
+        /// <summary>Update entrant count displayed on overlay.</summary>
+        public void UpdateEntrantCount(int count)
+        {
+            EntrantCountText.Text = $"{count} entrant{(count == 1 ? "" : "s")}";
+        }
+
+        /// <summary>Stop the countdown and hide the countdown panel.</summary>
+        public void StopCountdown()
+        {
+            _countdownTimer?.Stop();
+            _countdownTimer = null;
+            CountdownPanel.Visibility = Visibility.Collapsed;
+        }
+
+        /// <summary>Set the instruction line shown below the countdown (e.g. which command or GW2 mode).</summary>
+        public void SetEntryInstruction(string text)
+        {
+            EntryInstructionText.Text = text;
+        }
+
+        /// <summary>Update the mode badge shown under "Giveaway Active!" to reflect the current giveaway mode.</summary>
+        public void SetGiveawayModeHint(GiveawayMode mode)
+        {
+            (string emoji, string label, string color) = mode switch
+            {
+                GiveawayMode.BankOnly    => ("🏦", "Bank Roll",     "#6699FF"),
+                GiveawayMode.PrizeOnly   => ("⭐", "Prize Pool",    "#FFD700"),
+                GiveawayMode.RandomPool  => ("🎲", "Random Pool",   "#FF88FF"),
+                _                        => ("🎲", "Random Pool",   "#FF88FF")
+            };
+
+            ModeBadgeText.Text = $"{emoji} {label}";
+            ModeBadgeText.Foreground = new SolidColorBrush((Color)System.Windows.Media.ColorConverter.ConvertFromString(color));
+        }
+
+        private void UpdateCountdownDisplay(int? overrideCount = null)
+        {
+            int s = _countdownSeconds;
+            CountdownText.Text = s >= 3600
+                ? TimeSpan.FromSeconds(s).ToString(@"h\:mm\:ss")
+                : TimeSpan.FromSeconds(s).ToString(@"m\:ss");
+            CountdownText.Foreground = s <= 10
+                ? new SolidColorBrush(Colors.OrangeRed)
+                : new SolidColorBrush(Colors.White);
+            CountdownLabel.Text = "Entry closes in";
+        }
 
         public OverlayWindow()
         {
@@ -73,9 +157,19 @@ namespace Gw2Giveaway
             PrizeGrid.Visibility = Visibility.Visible;
         }
 
+        /// <summary>Directly set the prize image without reloading via URL (e.g. already-loaded BitmapImage).</summary>
+        public void SetPrizeImage(BitmapImage image)
+        {
+            PrizeImage.Source = image;
+        }
+
         public void ResetToPrize()
         {
-            UpdatePrize(PrizeTitleText.Text.Replace("Win: ", ""), PrizeImage.Source?.ToString() ?? "");
+            _winnerPrizeCarouselTimer?.Stop();
+            _prizePreviewCarouselTimer?.Stop();
+            PrizePoolPanel.Visibility = Visibility.Visible;
+            HideAllGrids();
+            PrizeGrid.Visibility = Visibility.Visible;
         }
 
         public void ShowBankWinner(string user, BitmapImage? icon, string prizeText)
@@ -548,7 +642,7 @@ namespace Gw2Giveaway
                         onChatAnnounce?.Invoke(winner);
 
                         // Auto-close overlay after showing winner for a few seconds
-                        AutoCloseAfterDelay(5000);
+                        AutoCloseAfterDelay(7000);
                     }
                 });
             };
@@ -652,7 +746,7 @@ namespace Gw2Giveaway
                 {
                     // Prize was picked — send chat message and auto-close after delay
                     onChatAnnounce?.Invoke(winner);
-                    AutoCloseAfterDelay(5000);
+                    AutoCloseAfterDelay(7000);
                 }
             });
         }

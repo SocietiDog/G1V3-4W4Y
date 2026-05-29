@@ -309,7 +309,7 @@ namespace Gw2Giveaway
                 _triviaActive = false;
                 CommandManager.InvalidateRequerySuggested();
 
-                SendBotMessage("I couldn't start a trivia round right now. Please try again in a moment.");
+                SendBotMessage("Trivia-Tron couldn't start a round right now. Please try again in a moment.");
             }
         }
 
@@ -327,9 +327,10 @@ namespace Gw2Giveaway
             Task.Delay(20000).ContinueWith(_ => Application.Current.Dispatcher.Invoke(() => LeaderboardVisible = false));
         }
 
-        private async void HandleChatMessage(string username, string message)
+        private async void HandleChatMessage(string username, string message, bool isSubscriber)
         {
             if (!IsTriviaEnabled) return;
+            if (IsTriviaPaused) return;  // giveaway is running — ignore ALL trivia commands
 
             username = username.ToLowerInvariant();
             string msgLower = message.Trim().ToLowerInvariant();
@@ -375,10 +376,13 @@ namespace Gw2Giveaway
                 return;
             }
 
-            // !answer
-            if (msgLower.StartsWith("!answer ") && _triviaActive)
+            // !answer / !a / !ik ("I Know") — all submit an answer
+            if (_triviaActive && (msgLower.StartsWith("!answer ") || msgLower.StartsWith("!a ") || msgLower.StartsWith("!ik ")))
             {
-                string answer = msgLower["!answer ".Length..].Trim().ToUpperInvariant();
+                int cmdLen = msgLower.StartsWith("!answer ") ? "!answer ".Length
+                           : msgLower.StartsWith("!ik ")     ? "!ik ".Length
+                           : "!a ".Length;
+                string answer = msgLower[cmdLen..].Trim().ToUpperInvariant();
                 if (answer.Length == 1 && "ABCD".Contains(answer) && answer == _currentCorrectLetter && !_correctAnswerers.Contains(username))
                 {
                     _correctAnswerers.Add(username);

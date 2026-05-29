@@ -39,29 +39,41 @@ namespace Gw2Giveaway
     {
         public PrizeSlot[,] Slots { get; set; }
         public long GoldAmount { get; set; } = 0;
+        public int Rows { get; set; } = 3;
+        public int Cols { get; set; } = 10;
 
-        public PrizeBank()
+        public PrizeBank() : this(3, 10) { }
+
+        public PrizeBank(int rows, int cols)
         {
-            Slots = new PrizeSlot[3, 10];
-            for (int r = 0; r < 3; r++)
-            {
-                for (int c = 0; c < 10; c++)
-                {
+            Rows = rows;
+            Cols = cols;
+            Slots = new PrizeSlot[rows, cols];
+            for (int r = 0; r < rows; r++)
+                for (int c = 0; c < cols; c++)
                     Slots[r, c] = new PrizeSlot();
-                }
-            }
+        }
+
+        /// <summary>Resize the grid, preserving as many existing slots as fit.</summary>
+        public void Resize(int newRows, int newCols)
+        {
+            var newSlots = new PrizeSlot[newRows, newCols];
+            for (int r = 0; r < newRows; r++)
+                for (int c = 0; c < newCols; c++)
+                    newSlots[r, c] = (r < Rows && c < Cols) ? Slots[r, c] : new PrizeSlot();
+            Slots = newSlots;
+            Rows = newRows;
+            Cols = newCols;
         }
 
         public void Hydrate()
         {
-            for (int r = 0; r < 3; r++)
-            {
-                for (int c = 0; c < 10; c++)
+            for (int r = 0; r < Rows; r++)
+                for (int c = 0; c < Cols; c++)
                 {
                     var slot = Slots[r, c];
                     slot.Item = Gw2ItemDatabase.Items.TryGetValue(slot.ItemId, out var info) ? info : null;
                 }
-            }
         }
         // 1. Add this method to PrizeBank class (consumes the won amount from the slot)
         public void ConsumePrize(PrizeWin win)
@@ -98,9 +110,9 @@ namespace Gw2Giveaway
 
             var weightedPrizes = new List<(PrizeWin prize, int weight)>();
 
-            for (int r = 0; r < 3; r++)
+            for (int r = 0; r < Rows; r++)
             {
-                for (int c = 0; c < 10; c++)
+                for (int c = 0; c < Cols; c++)
                 {
                     var slot = Slots[r, c];
                     bool hasPrize = slot.Item != null || !string.IsNullOrEmpty(slot.CustomName);

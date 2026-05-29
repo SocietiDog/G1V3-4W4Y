@@ -195,14 +195,14 @@
             <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
                 <TextBlock Text="First correct:" Width="180" VerticalAlignment="Center"/>
                 <TextBox Text="{Binding FirstCorrectReward, UpdateSourceTrigger=PropertyChanged}" Width="100"/>
-                <TextBlock Text=" Gold" VerticalAlignment="Center" Margin="10,0"/>
+                <TextBlock Text=" IQ" VerticalAlignment="Center" Margin="10,0"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
                 <TextBlock Text="Later correct:" Width="180" VerticalAlignment="Center"/>
                 <TextBox Text="{Binding LaterCorrectReward, UpdateSourceTrigger=PropertyChanged}" Width="100"/>
-                <TextBlock Text=" Gold" VerticalAlignment="Center" Margin="10,0"/>
+                <TextBlock Text=" IQ" VerticalAlignment="Center" Margin="10,0"/>
             </StackPanel>
-            <StackPanel HorizontalAlignment="Center" Orientation="Horizontal" Margin="30,5,30,5">
+            <StackPanel HorizontalAlignment="Center" Orientation="Horizontal" Margin="25,5,30,5">
                 <Button Content="Reset Colors to Defaults" Style="{StaticResource BankButton}" Click="ResetColors_Click" Padding="15,8" Margin="0,0,50,0" Height="40"/>
                 <Button Content="Save and Close" Style="{StaticResource BankButton}" Click="SaveButton_Click" Padding="15,8" Height="40"/>
             </StackPanel>

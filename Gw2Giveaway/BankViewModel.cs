@@ -265,21 +265,75 @@ namespace Gw2Giveaway
 
         private readonly PrizeBank _bank;
         private readonly Action _save;
+        private readonly Action<int, int>? _onResize;
 
-        public BankViewModel(PrizeBank bank, Action save, bool showRarityBadges = true)
+        public int GridRows => _bank.Rows;
+        public int GridCols => _bank.Cols;
+
+        public ICommand ResizeGridCommand { get; }
+
+        public BankViewModel(PrizeBank bank, Action save, bool showRarityBadges = true, Action<int, int>? onResize = null)
         {
             _bank = bank;
             _save = save;
+            _onResize = onResize;
             ShowPrizeRarityBadges = showRarityBadges;
             _goldAmount = bank.GoldAmount;
 
-            for (int r = 0; r < 3; r++)
-            {
-                for (int c = 0; c < 10; c++)
-                {
+            for (int r = 0; r < bank.Rows; r++)
+                for (int c = 0; c < bank.Cols; c++)
                     Slots.Add(new SlotViewModel(bank.Slots[r, c], _save, showRarityBadges));
+
+            ResizeGridCommand = new RelayCommand(_ =>
+            {
+                var dlg = new InputDialog("Enter grid size as Rows x Columns (e.g. 3x10, max 10x20):",
+                    $"{_bank.Rows}x{_bank.Cols}");
+                if (dlg.ShowDialog() != true) return;
+                var parts = dlg.Result.ToLowerInvariant().Split('x');
+                if (parts.Length != 2
+                    || !int.TryParse(parts[0].Trim(), out int newRows) || newRows < 1 || newRows > 10
+                    || !int.TryParse(parts[1].Trim(), out int newCols) || newCols < 1 || newCols > 20)
+                {
+                    DialogService.ShowInfo("Invalid format. Use Rows x Columns, e.g. 3x10.", "Invalid Input");
+                    return;
                 }
-            }
+
+                bool isShrinking = newRows < _bank.Rows || newCols < _bank.Cols;
+                if (isShrinking)
+                {
+                    int removedPrizeCount = 0;
+                    for (int r = 0; r < _bank.Rows; r++)
+                    {
+                        for (int c = 0; c < _bank.Cols; c++)
+                        {
+                            if (r < newRows && c < newCols)
+                                continue;
+
+                            var slot = _bank.Slots[r, c];
+                            bool hasPrize = slot.Item != null || !string.IsNullOrWhiteSpace(slot.CustomName);
+                            if (hasPrize)
+                                removedPrizeCount++;
+                        }
+                    }
+
+                    if (removedPrizeCount > 0)
+                    {
+                        var confirm = DialogService.ShowConfirm(
+                            $"Shrinking to {newRows}x{newCols} will remove {removedPrizeCount} prize slot(s) that are outside the new grid. Continue?",
+                            "Confirm Grid Shrink",
+                            yesText: "Shrink",
+                            noText: "Cancel",
+                            cancelText: "Cancel");
+
+                        if (confirm != MessageBoxResult.Yes)
+                            return;
+                    }
+                }
+
+                _bank.Resize(newRows, newCols);
+                _save();
+                _onResize?.Invoke(newRows, newCols);
+            });
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

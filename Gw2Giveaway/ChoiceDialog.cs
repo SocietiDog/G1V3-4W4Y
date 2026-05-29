@@ -26,7 +26,7 @@ namespace Gw2Giveaway
                 CornerRadius = new CornerRadius(16),
                 BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFEFDFDF")),
                 BorderThickness = new Thickness(3),
-                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#EE1a1a2e")),
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#EE1C1008")),
                 Padding = new Thickness(24),
                 Effect = new DropShadowEffect { Color = Colors.Black, BlurRadius = 20, ShadowDepth = 0, Opacity = 0.6 }
             };

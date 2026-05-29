@@ -25,26 +25,24 @@ namespace Gw2Giveaway
             Background = Brushes.Transparent;
             DialogService.ConfigureDialogWindow(this);
 
-            // Outer border matching app theme
             Border outer = new Border
             {
                 CornerRadius = new CornerRadius(16),
                 BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFEFDFDF")),
                 BorderThickness = new Thickness(3),
-                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#EE1a1a2e")),
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#EE1C1008")),
                 Padding = new Thickness(20),
                 Effect = new DropShadowEffect { Color = Colors.Black, BlurRadius = 20, ShadowDepth = 0, Opacity = 0.6 }
             };
             outer.MouseLeftButtonDown += (s, e) => { if (e.ChangedButton == MouseButton.Left) DragMove(); };
 
             Grid mainGrid = new Grid();
-            mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // title bar
-            mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // header
-            mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // search box
-            mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // results
-            mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // buttons
+            mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-            // Title bar with close button
             Grid titleBar = new Grid { Margin = new Thickness(0, 0, 0, 10) };
             TextBlock titleText = new TextBlock
             {
@@ -57,7 +55,7 @@ namespace Gw2Giveaway
             Button closeBtn = CreateThemedButton("✕", false);
             closeBtn.Width = 40;
             closeBtn.Height = 40;
-            closeBtn.FontSize = 18;
+            closeBtn.FontSize = 12;
             closeBtn.HorizontalAlignment = HorizontalAlignment.Right;
             closeBtn.Click += (s, e) => { DialogResult = false; Close(); };
             titleBar.Children.Add(titleText);
@@ -88,16 +86,6 @@ namespace Gw2Giveaway
             };
             Grid.SetRow(searchBox, 2);
 
-            searchBox.TextChanged += (s, e) =>
-            {
-                string query = searchBox.Text.Trim();
-                var results = Gw2ItemDatabase.Search(query);
-                _resultsList.ItemsSource = results;
-
-                if (results.Count > 0)
-                    _resultsList.SelectedIndex = 0;
-            };
-
             _resultsList = new ListBox
             {
                 Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CC000000")),
@@ -107,7 +95,6 @@ namespace Gw2Giveaway
                 Margin = new Thickness(0, 0, 0, 12)
             };
 
-            // Style ListBoxItems for dark theme
             var itemContainerStyle = new Style(typeof(ListBoxItem));
             itemContainerStyle.Setters.Add(new Setter(ListBoxItem.BackgroundProperty, Brushes.Transparent));
             itemContainerStyle.Setters.Add(new Setter(ListBoxItem.ForegroundProperty, Brushes.White));
@@ -131,7 +118,16 @@ namespace Gw2Giveaway
             };
             Grid.SetRow(_resultsList, 3);
 
-            // DataTemplate: Name (bold) - Rarity (orange) - ID (gray)
+            searchBox.TextChanged += (s, e) =>
+            {
+                string query = searchBox.Text.Trim();
+                var results = Gw2ItemDatabase.Search(query);
+                _resultsList.ItemsSource = results;
+
+                if (results.Count > 0)
+                    _resultsList.SelectedIndex = 0;
+            };
+
             DataTemplate template = new DataTemplate();
             FrameworkElementFactory stack = new FrameworkElementFactory(typeof(StackPanel));
             stack.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
@@ -159,7 +155,6 @@ namespace Gw2Giveaway
             template.VisualTree = stack;
             _resultsList.ItemTemplate = template;
 
-            // Buttons row
             StackPanel buttons = new StackPanel
             {
                 Orientation = Orientation.Horizontal,

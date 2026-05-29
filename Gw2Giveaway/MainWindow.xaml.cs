@@ -13,11 +13,13 @@ using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using TwitchLib.Api;
 
 
 namespace Gw2Giveaway
@@ -90,7 +92,22 @@ namespace Gw2Giveaway
 
         private bool _entriesOpen = false;
         private DispatcherTimer _entryTimer = new();
+        private DispatcherTimer? _activeUsersPollTimer;
         private int _entryTimeSeconds = 300;
+
+        // GW2 account name map: Twitch login -> GW2 account name
+        private readonly Dictionary<string, string> _gw2AccountMap = new(StringComparer.OrdinalIgnoreCase);
+
+        // Follower cache: Twitch login -> (isFollower, expiry)
+        private readonly Dictionary<string, (bool IsFollower, DateTime Expiry)> _followerCache = new(StringComparer.OrdinalIgnoreCase);
+        private static readonly TimeSpan FollowerCacheTtl = TimeSpan.FromMinutes(5);
+
+        // Winner messages tab
+        private string? _currentWinner;
+        public ObservableCollection<WinnerChatMessage> WinnerMessages { get; } = new();
+
+        // YouTube Beta
+        private YouTubeChat? _youtube;
 
         public PrizeBank Bank { get; private set; } = new();
 
@@ -98,8 +115,13 @@ namespace Gw2Giveaway
 
         private const string DefaultTwitchClientId = "dlql0djuoozvkc81epya43ilibu19e";
         private const string TwitchOAuthRedirectUri = "http://localhost:54827/callback/";
-        private const string TwitchOAuthScopes = "chat:read chat:edit channel:read:redemptions";
+        private const string TwitchOAuthScopes = "chat:read chat:edit channel:read:redemptions moderator:read:chatters moderator:read:followers";
+        private const int ActiveUsersPollIntervalSeconds = 30;
         private const int CurrentDisclaimerVersion = 1;
+
+        private static string AppDisplayVersion =>
+            Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion?.Split('+', StringSplitOptions.RemoveEmptyEntries)[0]
+            ?? "1.0.0";
 
         private static readonly string DisclaimerText = """
             Important Disclaimer
@@ -118,18 +140,20 @@ namespace Gw2Giveaway
             - This project is not affiliated with, endorsed by, or sponsored by ArenaNet, Guild Wars 2, or Twitch.
             """;
 
-        private static readonly string DataFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data");
-        private static readonly string BankFile = Path.Combine(DataFolder, "prizebank.json");
-        private static readonly string SettingsFile = Path.Combine(DataFolder, "settings.json");
-        private static readonly string ViewersDbFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "viewers.db");
+        private static readonly string DataFolder = AppDataPaths.DataFolder;
+        private static readonly string BankFile = AppDataPaths.BankFile;
+        private static readonly string SettingsFile = AppDataPaths.SettingsFile;
+        private static readonly string ViewersDbFile = AppDataPaths.ViewersDbFile;
 
         private AppSettings _settings = new();
         private string _oauthAccessToken = string.Empty;
+        private string _oauthUserId = string.Empty;
 
         private ObservableCollection<ChannelPointReward> _channelPointRewards = new();
         public ObservableCollection<ChannelPointReward> ChannelPointRewards => _channelPointRewards;
 
         private readonly DatabaseService _databaseService = new();
+        private readonly TwitchAPI _twitchApi = new();
 
         private ObservableCollection<GiveawayHistoryEntry> _giveawayHistory = new();
 
@@ -139,11 +163,34 @@ namespace Gw2Giveaway
             public long Iq { get; set; }
         }
 
+        public sealed class WinnerChatMessage
+        {
+            public string Sender { get; set; } = string.Empty;
+            public string Text { get; set; } = string.Empty;
+            public override string ToString() => $"{Sender}: {Text}";
+        }
+
+        /// <summary>Returns the GW2 account name for a Twitch user, or empty string if not set.</summary>
+        public string GetGw2AccountName(string twitchLogin)
+            => _gw2AccountMap.TryGetValue(twitchLogin, out var name) ? name : string.Empty;
+
         public MainWindow()
         {
             Instance = this;
             InitializeComponent();
+            AppNameVersionText.Text = $"G1V3 - 4W4Y Beta v{AppDisplayVersion}";
             Loaded += MainWindow_Loaded;
+            Closing += (s, e) =>
+            {
+                if (TryCaptureWindowBounds(this, out var left, out var top, out var width, out var height))
+                {
+                    _settings.MainWindowLeft = left;
+                    _settings.MainWindowTop = top;
+                    _settings.MainWindowWidth = width;
+                    _settings.MainWindowHeight = height;
+                    PersistSettings();
+                }
+            };
 
             try
             {
@@ -151,12 +198,17 @@ namespace Gw2Giveaway
                 {
                     EntrantsList.ItemsSource = Entrants;
                 }
+                if (WinnerMessagesList != null)
+                {
+                    WinnerMessagesList.ItemsSource = WinnerMessages;
+                }
                 // Create TriviaViewModel with the shared TwitchChat instance
                 Trivia = new TriviaViewModel(_twitch);
 
                 try
                 {
                     LoadSettings();
+                    ApplySavedWindowBounds(this, _settings.MainWindowLeft, _settings.MainWindowTop, _settings.MainWindowWidth, _settings.MainWindowHeight);
                 }
                 catch (Exception ex)
                 {
@@ -179,7 +231,8 @@ namespace Gw2Giveaway
                         ConnectButton.IsEnabled = false;
                         DisconnectButton.IsEnabled = true;
 
-                        await _twitch.SendMessageAsync("G1V3 - 4W4Y bot is online.");
+                        string onlineName = !string.IsNullOrWhiteSpace(BotNameText.Text) ? BotNameText.Text.Trim() : _settings.TwitchBotName;
+                        await _twitch.SendMessageAsync($"{onlineName} is online.");
 
                         // Connect EventSub for channel points
                         string broadcasterId = BroadcasterIdText.Text.Trim();
@@ -253,6 +306,7 @@ namespace Gw2Giveaway
 
                 _ = LoadDatabaseWithProgress();
                 _ = RefreshDataManagementViewAsync();
+                _ = RefreshViewerCountAsync();
 
                 if (_settings.AutoOpenOverlay)
                     ShowTriviaOverlay();
@@ -278,7 +332,7 @@ namespace Gw2Giveaway
             if (_settings.DisclaimerAccepted && _settings.DisclaimerAcceptedVersion >= CurrentDisclaimerVersion)
                 return true;
 
-            var dialog = new DisclaimerDialog("Disclaimer & Terms", DisclaimerText, requireAcceptance: true);
+            var dialog = new DisclaimerDialog($"Disclaimer & Terms • Beta v{AppDisplayVersion}", DisclaimerText, requireAcceptance: true);
             dialog.ShowDialog();
 
             if (!dialog.Accepted)
@@ -328,6 +382,14 @@ namespace Gw2Giveaway
             if (string.IsNullOrWhiteSpace(_settings.TwitchBotName))
                 _settings.TwitchBotName = "G1V3 - 4W4Y";
 
+            if (EntryModeCombo != null)
+            {
+                int entryIndex = (int)_settings.EntryType;
+                if (entryIndex < 0 || entryIndex >= EntryModeCombo.Items.Count)
+                    entryIndex = 0;
+                EntryModeCombo.SelectedIndex = entryIndex;
+            }
+
             _channelPointRewards = _settings.ChannelPointRewards != null
                 ? new ObservableCollection<ChannelPointReward>(_settings.ChannelPointRewards.Where(r => r != null).Select(r => new ChannelPointReward
                 {
@@ -338,25 +400,48 @@ namespace Gw2Giveaway
                 }))
                 : new ObservableCollection<ChannelPointReward>();
 
-            _giveawayHistory = _settings.GiveawayHistory != null
-                ? new ObservableCollection<GiveawayHistoryEntry>(_settings.GiveawayHistory
-                    .Where(h => h != null)
-                    .OrderByDescending(h => h.TimestampUtc))
-                : new ObservableCollection<GiveawayHistoryEntry>();
+            // Migrate legacy JSON winner history into the DB (one-time)
+            if (_settings.GiveawayHistory != null && _settings.GiveawayHistory.Count > 0)
+            {
+                var toMigrate = _settings.GiveawayHistory.Where(h => h != null).ToList();
+                _ = _databaseService.BulkAddWinnersAsync(toMigrate);
+                _settings.GiveawayHistory.Clear();
+            }
+            _giveawayHistory = new ObservableCollection<GiveawayHistoryEntry>();
 
             // Giveaway settings
             ChannelText.Text = _settings.TwitchChannel;
             BotNameText.Text = _settings.TwitchBotName;
             _oauthAccessToken = _settings.TwitchOAuth;
             BroadcasterIdText.Text = _settings.BroadcasterId;
-            EntryModeCombo.SelectedIndex = (int)_settings.EntryType;
+            if (EntryModeCombo != null)
+            {
+                int entryIndex = (int)_settings.EntryType;
+                if (entryIndex < 0 || entryIndex >= EntryModeCombo.Items.Count)
+                    entryIndex = 0;
+                EntryModeCombo.SelectedIndex = entryIndex;
+            }
             EntryCommandText.Text = _settings.EntryCommand;
+            UpdateEntryCommandFieldState();
+            if (FollowersOnlyCheck != null)
+                FollowersOnlyCheck.IsChecked = _settings.FollowersOnly;
+            if (SubBonusEntriesText != null)
+                SubBonusEntriesText.Text = _settings.SubscriberBonusEntries.ToString();
+
+            // YouTube Beta
+            if (YouTubeBetaEnabledCheck != null)
+                YouTubeBetaEnabledCheck.IsChecked = _settings.YouTubeBetaEnabled;
+            if (YouTubeVideoIdText != null)
+                YouTubeVideoIdText.Text = _settings.YouTubeVideoId;
+            if (YouTubeBetaPanel != null)
+                YouTubeBetaPanel.IsEnabled = _settings.YouTubeBetaEnabled;
             ChatTemplateText.Text = _settings.ChatTemplate;
             WinnerPrizeTemplateText.Text = _settings.WinnerPrizeTemplate;
             GiveawayModeCombo.SelectedIndex = (int)_settings.CurrentGiveawayMode;
             BankPercentageSlider.Value = _settings.RandomPoolBankPercentage;
             UpdateBankPercentageDisplay();
             ShowRarityBadgesCheck.IsChecked = _settings.ShowPrizeRarityBadges;
+            ShowRarityBadgesCheck2.IsChecked = _settings.ShowPrizeRarityBadges;
             SlotRollDurationSlider.Value = _settings.SlotRollDurationSeconds;
             BankRollDurationSlider.Value = _settings.BankRollDurationSeconds;
             UpdateSlotRollDurationDisplay();
@@ -405,8 +490,15 @@ namespace Gw2Giveaway
             }
             _settings.TwitchClientId = string.IsNullOrWhiteSpace(_settings.TwitchClientId) ? DefaultTwitchClientId : _settings.TwitchClientId;
             _settings.BroadcasterId = BroadcasterIdText.Text.Trim();
-            _settings.EntryType = (EntryMode)EntryModeCombo.SelectedIndex;
+            _settings.EntryType = (EntryMode)Math.Clamp(EntryModeCombo.SelectedIndex, 0, 2);
             _settings.EntryCommand = EntryCommandText.Text.Trim();
+            _settings.FollowersOnly = FollowersOnlyCheck?.IsChecked == true;
+            if (int.TryParse(SubBonusEntriesText?.Text?.Trim(), out int bonusEntries) && bonusEntries >= 1)
+                _settings.SubscriberBonusEntries = bonusEntries;
+
+            // YouTube Beta
+            _settings.YouTubeBetaEnabled = YouTubeBetaEnabledCheck?.IsChecked == true;
+            _settings.YouTubeVideoId = YouTubeVideoIdText?.Text?.Trim() ?? string.Empty;
             _settings.ChatTemplate = ChatTemplateText.Text;
             _settings.WinnerPrizeTemplate = WinnerPrizeTemplateText.Text;
             _settings.ShowPrizeRarityBadges = ShowRarityBadgesCheck.IsChecked == true;
@@ -428,17 +520,8 @@ namespace Gw2Giveaway
                 Action = r.Action,
                 InstantGoldAmount = r.InstantGoldAmount
             }));
-            _settings.GiveawayHistory = new ObservableCollection<GiveawayHistoryEntry>(_giveawayHistory
-                .OrderByDescending(h => h.TimestampUtc)
-                .Take(1000)
-                .Select(h => new GiveawayHistoryEntry
-                {
-                    TimestampUtc = h.TimestampUtc,
-                    Winner = h.Winner,
-                    Prize = h.Prize,
-                    Amount = h.Amount,
-                    Source = h.Source
-                }));
+            // Winner history is now stored in viewers.db — not in settings.json
+            _settings.GiveawayHistory.Clear();
 
             // Giveaway mode settings
             _settings.CurrentGiveawayMode = (GiveawayMode)GiveawayModeCombo.SelectedIndex;
@@ -512,7 +595,22 @@ namespace Gw2Giveaway
         private void OpenTriviaSettings_Click(object sender, RoutedEventArgs e)
         {
             var settingsWindow = new SettingsWindow(Trivia, this);
+            ApplySavedWindowBounds(settingsWindow,
+                _settings.TriviaSettingsLeft,
+                _settings.TriviaSettingsTop,
+                _settings.TriviaSettingsWidth,
+                _settings.TriviaSettingsHeight);
+
             settingsWindow.ShowDialog();
+
+            if (TryCaptureWindowBounds(settingsWindow, out var left, out var top, out var width, out var height))
+            {
+                _settings.TriviaSettingsLeft = left;
+                _settings.TriviaSettingsTop = top;
+                _settings.TriviaSettingsWidth = width;
+                _settings.TriviaSettingsHeight = height;
+                PersistSettings();
+            }
         }
         private async Task LoadDatabaseWithProgress(bool forceRefresh = false)
         {
@@ -563,16 +661,19 @@ namespace Gw2Giveaway
 
         private void ViewDisclaimer_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new DisclaimerDialog("Disclaimer & Terms", DisclaimerText, requireAcceptance: false);
+            var dialog = new DisclaimerDialog($"Disclaimer & Terms • v{AppDisplayVersion}", DisclaimerText, requireAcceptance: false);
             dialog.ShowDialog();
         }
 
         private void LoadBankFromFile()
         {
+            int savedRows = _settings.BankRows > 0 ? _settings.BankRows : 3;
+            int savedCols = _settings.BankColumns > 0 ? _settings.BankColumns : 10;
+
             if (!File.Exists(BankFile))
             {
-                Bank = new PrizeBank();
-                SaveBank();
+                Bank = new PrizeBank(savedRows, savedCols);
+                SaveBank(); // brand-new install/run only
                 return;
             }
 
@@ -580,35 +681,54 @@ namespace Gw2Giveaway
             {
                 string json = File.ReadAllText(BankFile);
                 var loaded = JsonConvert.DeserializeObject<PrizeBank>(json);
-                if (loaded != null)
+                if (loaded == null)
                 {
-                    Bank = loaded;
+                    AppLogger.LogInfo("LoadBankFromFile", $"Bank file exists but deserialized null. Keeping existing file intact: {BankFile}");
+                    DialogService.ShowInfo("Failed to read prize bank data. The existing bank file was NOT changed.");
+                    Bank = new PrizeBank(savedRows, savedCols);
+                    Bank.Hydrate();
+                    return;
+                }
 
-                    if (Bank.Slots == null || Bank.Slots.GetLength(0) != 3 || Bank.Slots.GetLength(1) != 10)
-                    {
-                        Bank = new PrizeBank();
-                    }
-                }
-                else
+                Bank = loaded;
+
+                // Ensure Rows/Cols are consistent with the actual array dimensions
+                int actualRows = Bank.Slots?.GetLength(0) ?? 0;
+                int actualCols = Bank.Slots?.GetLength(1) ?? 0;
+                if (Bank.Slots == null || actualRows == 0 || actualCols == 0)
                 {
-                    Bank = new PrizeBank();
+                    AppLogger.LogInfo("LoadBankFromFile", $"Bank file has invalid slot matrix. Keeping existing file intact: {BankFile}");
+                    DialogService.ShowInfo("Prize bank data is invalid. The existing bank file was NOT changed.");
+                    Bank = new PrizeBank(savedRows, savedCols);
+                    Bank.Hydrate();
+                    return;
                 }
+
+                // Sync Rows/Cols in case this is an old save without them
+                Bank.Rows = actualRows;
+                Bank.Cols = actualCols;
+                _settings.BankRows = actualRows;
+                _settings.BankColumns = actualCols;
             }
             catch (Exception ex)
             {
                 AppLogger.LogError("LoadBankFromFile", ex);
-                DialogService.ShowInfo("Failed to load prize bank – starting with fresh empty bank.\n" + ex.Message);
-                Bank = new PrizeBank();
+                DialogService.ShowInfo("Failed to load prize bank. The existing bank file was NOT changed.\n" + ex.Message);
+                Bank = new PrizeBank(savedRows, savedCols);
+                Bank.Hydrate();
+                return;
             }
 
             Bank.Hydrate();
-            SaveBank();
         }
 
         private void SaveBank()
         {
             try
             {
+                // Keep settings in sync with the actual bank dimensions
+                _settings.BankRows = Bank.Rows;
+                _settings.BankColumns = Bank.Cols;
                 Directory.CreateDirectory(DataFolder);
                 string json = JsonConvert.SerializeObject(Bank, Formatting.Indented);
                 File.WriteAllText(BankFile, json);
@@ -628,8 +748,63 @@ namespace Gw2Giveaway
             _triviaOverlay?.Close();
             _overlay?.Close();
             _bankWindow?.Close();
+            _youtube?.Dispose();
 
             base.OnClosing(e);
+        }
+
+        // ── YouTube Beta handlers ──────────────────────────────────────────────────
+        private void YouTubeBetaEnabledCheck_Changed(object sender, RoutedEventArgs e)
+        {
+            bool enabled = YouTubeBetaEnabledCheck?.IsChecked == true;
+            if (YouTubeBetaPanel != null)
+                YouTubeBetaPanel.IsEnabled = enabled;
+
+            // If disabled while connected, disconnect
+            if (!enabled && _youtube != null)
+            {
+                _youtube.Disconnect();
+                YouTubeStatus.Text = "Not connected";
+                YouTubeStatus.Foreground = Brushes.IndianRed;
+            }
+        }
+
+        private async void ConnectYouTube_Click(object sender, RoutedEventArgs e)
+        {
+            string videoId = YouTubeVideoIdText?.Text?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(videoId))
+            {
+                DialogService.ShowInfo("Paste a YouTube live video ID or URL first.", "YouTube Beta");
+                return;
+            }
+
+            // Dispose any previous instance
+            _youtube?.Dispose();
+            _youtube = new YouTubeChat();
+
+            _youtube.OnStatusChanged += status =>
+                Dispatcher.Invoke(() =>
+                {
+                    YouTubeStatus.Text = status;
+                    YouTubeStatus.Foreground = status.StartsWith("✅") ? Brushes.LimeGreen
+                        : status.StartsWith("⚠") ? Brushes.Orange
+                        : Brushes.White;
+                });
+
+            _youtube.OnMessageReceived += (username, message, isMember) =>
+                Twitch_OnMessageReceived(username, message, isMember);
+
+            YouTubeStatus.Text = "Connecting…";
+            YouTubeStatus.Foreground = Brushes.Orange;
+
+            await _youtube.ConnectAsync(videoId);
+        }
+
+        private void DisconnectYouTube_Click(object sender, RoutedEventArgs e)
+        {
+            _youtube?.Disconnect();
+            YouTubeStatus.Text = "Not connected";
+            YouTubeStatus.Foreground = Brushes.IndianRed;
         }
 
         private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -640,12 +815,23 @@ namespace Gw2Giveaway
 
         private void ShowRarityBadgesCheck_Changed(object sender, RoutedEventArgs e)
         {
+            // Guard against firing during XAML initialization before both controls exist
+            if (ShowRarityBadgesCheck == null || ShowRarityBadgesCheck2 == null) return;
+
+            // Determine the new value from whichever checkbox triggered
+            bool show = (sender == ShowRarityBadgesCheck2)
+                ? ShowRarityBadgesCheck2.IsChecked == true
+                : ShowRarityBadgesCheck.IsChecked == true;
+
+            // Keep both in sync without re-firing events
+            if (ShowRarityBadgesCheck.IsChecked != show)
+                ShowRarityBadgesCheck.IsChecked = show;
+            if (ShowRarityBadgesCheck2.IsChecked != show)
+                ShowRarityBadgesCheck2.IsChecked = show;
+
             // Update the open Bank window if it exists
             if (_bankWindow != null)
-            {
-                bool show = ShowRarityBadgesCheck.IsChecked == true;
                 _bankWindow.UpdateShowRarityBadges(show);
-            }
         }
 
         private void MinimizeWindow_Click(object sender, RoutedEventArgs e)
@@ -656,6 +842,39 @@ namespace Gw2Giveaway
         private void Close_Click(object sender, RoutedEventArgs e)
         {
             Close();
+        }
+
+        private async Task RefreshViewerCountAsync()
+        {
+            try
+            {
+                string broadcasterId = BroadcasterIdText.Text.Trim();
+                string clientId = _settings.TwitchClientId;
+                string token = _oauthAccessToken;
+
+                if (string.IsNullOrWhiteSpace(broadcasterId) || string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(token))
+                {
+                    ViewerCountText.Text = "--";
+                    return;
+                }
+
+                _twitchApi.Settings.ClientId = clientId;
+                _twitchApi.Settings.AccessToken = token.StartsWith("oauth:", StringComparison.OrdinalIgnoreCase) ? token["oauth:".Length..] : token;
+
+                var response = await _twitchApi.Helix.Streams.GetStreamsAsync(userIds: new List<string> { broadcasterId });
+                var stream = response.Streams.FirstOrDefault();
+                ViewerCountText.Text = stream != null ? stream.ViewerCount.ToString() : "Offline";
+            }
+            catch (Exception ex)
+            {
+                AppLogger.LogError("MainWindow.RefreshViewerCountAsync", ex);
+                ViewerCountText.Text = "--";
+            }
+        }
+
+        private async void RefreshViewerCount_Click(object sender, RoutedEventArgs e)
+        {
+            await RefreshViewerCountAsync();
         }
 
         private async void AuthWithTwitch_Click(object sender, RoutedEventArgs e)
@@ -679,6 +898,8 @@ namespace Gw2Giveaway
                 var profile = await GetTwitchProfileAsync(token.AccessToken);
                 if (profile != null)
                 {
+                    _oauthUserId = profile.Value.UserId;
+
                     if (string.IsNullOrWhiteSpace(ChannelText.Text))
                         ChannelText.Text = profile.Value.Login;
 
@@ -690,7 +911,6 @@ namespace Gw2Giveaway
                 }
 
                 SaveSettings();
-
                 await CheckAndApplyChannelPointsAvailabilityAsync(token.AccessToken, _settings.TwitchClientId, BroadcasterIdText.Text.Trim());
 
                 TwitchStatus.Text = "Authorized";
@@ -858,6 +1078,122 @@ namespace Gw2Giveaway
             return (login.ToLowerInvariant(), userId);
         }
 
+        private async Task<HashSet<string>> GetCurrentChattersAsync()
+        {
+            var chatters = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            string broadcasterId = BroadcasterIdText.Text.Trim();
+            string moderatorId = _oauthUserId?.Trim() ?? string.Empty;
+            string clientId = _settings.TwitchClientId;
+            string token = _oauthAccessToken;
+
+            if (string.IsNullOrWhiteSpace(broadcasterId) ||
+                string.IsNullOrWhiteSpace(moderatorId) ||
+                string.IsNullOrWhiteSpace(clientId) ||
+                string.IsNullOrWhiteSpace(token))
+            {
+                return chatters;
+            }
+
+            string normalizedToken = token.StartsWith("oauth:", StringComparison.OrdinalIgnoreCase)
+                ? token["oauth:".Length..]
+                : token;
+
+            string? cursor = null;
+
+            do
+            {
+                string url = $"https://api.twitch.tv/helix/chat/chatters?broadcaster_id={Uri.EscapeDataString(broadcasterId)}&moderator_id={Uri.EscapeDataString(moderatorId)}&first=1000";
+                if (!string.IsNullOrWhiteSpace(cursor))
+                    url += $"&after={Uri.EscapeDataString(cursor)}";
+
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", normalizedToken);
+                request.Headers.Add("Client-Id", clientId);
+
+                using HttpResponseMessage response = await _httpClient.SendAsync(request);
+                if (!response.IsSuccessStatusCode)
+                {
+                    AppLogger.LogError("GetCurrentChattersAsync.Http", new Exception($"Twitch chatters request failed: {(int)response.StatusCode}"));
+                    return chatters;
+                }
+
+                string body = await response.Content.ReadAsStringAsync();
+                using JsonDocument doc = JsonDocument.Parse(body);
+
+                if (doc.RootElement.TryGetProperty("data", out JsonElement dataEl) && dataEl.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (JsonElement chatter in dataEl.EnumerateArray())
+                    {
+                        if (chatter.TryGetProperty("user_login", out JsonElement loginEl))
+                        {
+                            string login = loginEl.GetString() ?? string.Empty;
+                            if (!string.IsNullOrWhiteSpace(login))
+                                chatters.Add(login.ToLowerInvariant());
+                        }
+                    }
+                }
+
+                cursor = null;
+                if (doc.RootElement.TryGetProperty("pagination", out JsonElement pageEl) &&
+                    pageEl.ValueKind == JsonValueKind.Object &&
+                    pageEl.TryGetProperty("cursor", out JsonElement cursorEl))
+                {
+                    cursor = cursorEl.GetString();
+                }
+            }
+            while (!string.IsNullOrWhiteSpace(cursor));
+
+            return chatters;
+        }
+
+        private async Task ImportCurrentChattersAsync(bool announceErrors)
+        {
+            try
+            {
+                var chatters = await GetCurrentChattersAsync();
+                Dispatcher.Invoke(() =>
+                {
+                    foreach (string chatter in chatters)
+                    {
+                        if (!Entrants.Contains(chatter))
+                            Entrants.Add(chatter);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                AppLogger.LogError("ImportCurrentChattersAsync", ex);
+                if (announceErrors)
+                    DialogService.ShowInfo("Couldn't fetch full chatter list. Active Users will continue adding message senders.");
+            }
+        }
+
+        private void StartActiveUsersPolling()
+        {
+            StopActiveUsersPolling();
+
+            _activeUsersPollTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(ActiveUsersPollIntervalSeconds)
+            };
+            _activeUsersPollTimer.Tick += async (_, _) =>
+            {
+                if (_entriesOpen && _settings.EntryType == EntryMode.ActiveUsers)
+                    await ImportCurrentChattersAsync(announceErrors: false);
+            };
+            _activeUsersPollTimer.Start();
+        }
+
+        private void StopActiveUsersPolling()
+        {
+            if (_activeUsersPollTimer == null)
+                return;
+
+            _activeUsersPollTimer.Stop();
+            _activeUsersPollTimer = null;
+        }
+
         private async Task CheckAndApplyChannelPointsAvailabilityAsync(string accessToken, string clientId, string broadcasterId)
         {
             if (string.IsNullOrWhiteSpace(accessToken) || string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(broadcasterId))
@@ -938,8 +1274,11 @@ namespace Gw2Giveaway
             {
                 var oauthProfile = await GetTwitchProfileAsync(_oauthAccessToken);
                 string oauthLogin = oauthProfile?.Login ?? string.Empty;
+                if (oauthProfile != null)
+                    _oauthUserId = oauthProfile.Value.UserId;
 
                 _twitch.Channel = ChannelText.Text.Trim().ToLower();
+                // IRC credentials must use the OAuth account's login name — not a display name
                 _twitch.BotName = !string.IsNullOrWhiteSpace(oauthLogin)
                     ? oauthLogin
                     : _twitch.Channel;
@@ -970,6 +1309,14 @@ namespace Gw2Giveaway
 
         private async void Disconnect_Click(object sender, RoutedEventArgs e)
         {
+            StopActiveUsersPolling();
+
+            // Send goodbye message before disconnecting — read directly from the UI field so any unsaved edits are included
+            string botDisplayName = BotNameText.Text.Trim();
+            if (string.IsNullOrWhiteSpace(botDisplayName)) botDisplayName = _settings.TwitchBotName;
+            try { await _twitch.SendMessageAsync($"{botDisplayName} going offline. Thanks for playing! \U0001F44B"); }
+            catch { /* ignore if send fails */ }
+
             await _twitch.DisconnectAsync();
             await _eventSub.DisconnectAsync();
 
@@ -1209,6 +1556,47 @@ namespace Gw2Giveaway
             if (_overlay == null)
                 return;
 
+            var mode = _settings.CurrentGiveawayMode;
+
+            // Always update the mode badge
+            _overlay.SetGiveawayModeHint(mode);
+
+            if (mode == GiveawayMode.BankOnly)
+            {
+                // Show bank prizes in a carousel if any slots are filled, else generic bank icon
+                var bankPrizes = new List<(BitmapImage? Icon, string Text)>();
+                if (Bank?.Slots != null)
+                {
+                    for (int r = 0; r < Bank.Rows; r++)
+                        for (int c = 0; c < Bank.Cols; c++)
+                        {
+                            var slot = Bank.Slots[r, c];
+                            bool hasPrize = slot.Item != null || !string.IsNullOrEmpty(slot.CustomName);
+                            if (hasPrize)
+                            {
+                                string name = slot.CustomName ?? slot.Item?.Name ?? "Prize";
+                                string url  = slot.CustomIconUrl ?? slot.Item?.Icon ?? string.Empty;
+                                bankPrizes.Add((TryCreateBitmapImage(url), name));
+                            }
+                        }
+                }
+
+                if (bankPrizes.Count > 0)
+                {
+                    _overlay.UpdatePrize(bankPrizes[0].Text, string.Empty);
+                    if (bankPrizes[0].Icon != null)
+                        _overlay.SetPrizeImage(bankPrizes[0].Icon!);
+                    if (bankPrizes.Count > 1)
+                        _overlay.StartPrizePreviewCarousel(bankPrizes);
+                }
+                else
+                {
+                    _overlay.UpdatePrize("Bank Prize Roll", "pack://application:,,,/Images/Gold_coin.png");
+                }
+                return;
+            }
+
+            // PrizeOnly or RandomPool — show the configured prize/pool
             var poolEntries = GetClassicPrizePoolEntriesForRoll();
             if (poolEntries.Count > 0)
             {
@@ -1305,10 +1693,25 @@ namespace Gw2Giveaway
 
             var mode = _settings.CurrentGiveawayMode;
 
-            // BANK ONLY - no animation, direct bank roll
+            // BANK ONLY - show slot wheel for winner reveal, then bank payout via overlay callback
             if (mode == GiveawayMode.BankOnly)
             {
-                HandleBankRollDirect();
+                Random bankRnd = new Random();
+                string bankWinner = Entrants[bankRnd.Next(Entrants.Count)];
+
+                // Use a neutral placeholder while winner spins; actual bank prize is chosen in PerformBankRoll callback
+                BitmapImage? bankIcon = TryCreateBitmapImage("pack://application:,,,/Images/Gold_coin.png");
+                string bankPrizeText = "Bank Prize Roll";
+
+                _overlay?.StartSlotMachine(
+                    new System.Collections.Generic.List<string>(Entrants),
+                    bankIcon,
+                    bankPrizeText,
+                    onChatAnnounce: null,
+                    forcedWinner: bankWinner,
+                    rollDurationSeconds: _settings.SlotRollDurationSeconds,
+                    isRandomPoolMode: true,
+                    bankPercentage: 100);
                 return;
             }
 
@@ -1348,6 +1751,7 @@ namespace Gw2Giveaway
             bool isRandomMode = (mode == GiveawayMode.RandomPool);
 
             // Call overlay - always show slot wheel for these modes
+            _overlay?.ResetToPrize();
             _overlay?.StartSlotMachine(
                 new System.Collections.Generic.List<string>(Entrants),
                 prizeIcon,
@@ -1368,6 +1772,7 @@ namespace Gw2Giveaway
 
                         string chatMsgBundle = $"@{selectedWinner} won a prize bundle: {summary}! Congratulations!";
                         _twitch?.SendMessageAsync(chatMsgBundle);
+                        SetCurrentWinner(selectedWinner);
 
                         string bundlePrize = selectedPoolEntries.Count == 1
                             ? selectedPoolEntries[0].Name
@@ -1379,6 +1784,7 @@ namespace Gw2Giveaway
                     string amountPrefix = prizeAmount > 1 ? $"{prizeAmount} × " : string.Empty;
                     string chatMsg = $"@{selectedWinner} won {amountPrefix}{prizeName}! Congratulations!";
                     _twitch?.SendMessageAsync(chatMsg);
+                    SetCurrentWinner(selectedWinner);
 
                     LogGiveawayHistory(selectedWinner, prizeName, prizeAmount, mode == GiveawayMode.PrizeOnly ? "PrizeOnly" : "RandomPool:Prize");
                 },
@@ -1387,11 +1793,6 @@ namespace Gw2Giveaway
                 isRandomMode,
                 _settings.RandomPoolBankPercentage
             );
-        }
-
-        private async void HandleBankRollDirect()
-        {
-            await PerformBankRoll("Bank Roll", null);
         }
 
         private async void OpenPrizeBank_Click(object sender, RoutedEventArgs e)
@@ -1486,40 +1887,14 @@ namespace Gw2Giveaway
                     Bank.Hydrate();
                 }
 
-                // Gather all filled slots
-                List<(int row, int col)> filledSlots = new();
-                for (int r = 0; r < 3; r++)
+                PrizeWin? win = Bank.GetRandomPrize();
+                if (win == null)
                 {
-                    for (int c = 0; c < 10; c++)
-                    {
-                        var s = Bank.Slots[r, c];
-                        bool hasPrize = s.Item != null || !string.IsNullOrEmpty(s.CustomName);
-                        if (hasPrize && s.DisplayStack > 0)
-                            filledSlots.Add((r, c));
-                    }
-                }
-
-                if (filledSlots.Count == 0)
-                {
-                    DialogService.ShowInfo("No items in the bank to roll!");
+                    DialogService.ShowInfo("No prizes or gold in the bank to roll!");
                     return;
                 }
 
-                // Pick a random filled slot
                 Random rnd = new Random();
-                var (selectedRow, selectedCol) = filledSlots[rnd.Next(filledSlots.Count)];
-                var slot = Bank.Slots[selectedRow, selectedCol];
-
-                var win = new PrizeWin
-                {
-                    IsGold = false,
-                    WinAmount = slot.GiveawayAmount,
-                    WinItem = slot.Item,
-                    CustomName = slot.CustomName,
-                    CustomIconUrl = slot.CustomIconUrl,
-                    Row = selectedRow,
-                    Col = selectedCol
-                };
 
                 // Open (or reuse) the bank window
                 if (_bankWindow == null)
@@ -1528,7 +1903,22 @@ namespace Gw2Giveaway
                         await Gw2ItemDatabase.LoadAsync(_httpClient);
 
                     _bankWindow = new BankWindow(Bank, SaveBank, _settings.ShowPrizeRarityBadges);
-                    _bankWindow.Closed += (s, ev) => _bankWindow = null;
+                    ApplySavedWindowBounds(_bankWindow, _settings.PrizeBankLeft, _settings.PrizeBankTop, _settings.PrizeBankWidth, _settings.PrizeBankHeight);
+                    _bankWindow.IsVisibleChanged += BankWindow_IsVisibleChanged;
+                    _bankWindow.Closed += (s, ev) =>
+                    {
+                        if (TryCaptureWindowBounds(_bankWindow, out var left, out var top, out var width, out var height))
+                        {
+                            _settings.PrizeBankLeft = left;
+                            _settings.PrizeBankTop = top;
+                            _settings.PrizeBankWidth = width;
+                            _settings.PrizeBankHeight = height;
+                            PersistSettings();
+                        }
+
+                        _bankWindow = null;
+                        UpdateOverlayToggleButtons();
+                    };
                 }
 
                 _bankWindow.Show();
@@ -1546,9 +1936,18 @@ namespace Gw2Giveaway
                 SaveBank();
 
                 // Announce to chat
-                string prizeName = slot.Item?.Name ?? slot.CustomName ?? "Unknown";
-                string amountPrefix = win.WinAmount > 1 ? $"{win.WinAmount} × " : "";
-                await _twitch?.SendMessageAsync($"🏦 @{winnerName} won {amountPrefix}{prizeName}! Congrats!");
+                string prizeName = win.IsGold
+                    ? "Gold"
+                    : (win.WinItem?.Name ?? win.CustomName ?? "Unknown Prize");
+                string amountPrefix = win.IsGold
+                    ? string.Empty
+                    : (win.WinAmount > 1 ? $"{win.WinAmount} × " : "");
+                string chatPrizeText = win.IsGold
+                    ? $"{win.WinAmount} Gold"
+                    : $"{amountPrefix}{prizeName}";
+
+                await _twitch?.SendMessageAsync($"🏦 @{winnerName} won {chatPrizeText}! Congrats!");
+                SetCurrentWinner(winnerName);
                 LogGiveawayHistory(winnerName ?? "winner", prizeName, win.WinAmount, source);
             }
             catch (Exception ex)
@@ -1671,6 +2070,48 @@ namespace Gw2Giveaway
                 DialogService.ShowInfo("Select a reward from the list to remove it.");
             }
         }
+
+        private void EntryModeCombo_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            UpdateEntryCommandFieldState();
+            if (IsLoaded)
+                SaveSettings();
+        }
+
+        private void FollowersOnlyCheck_Changed(object sender, RoutedEventArgs e)
+        {
+            if (IsLoaded) SaveSettings();
+        }
+
+        private void SubBonusEntriesText_Changed(object sender, System.Windows.Controls.TextChangedEventArgs e)
+        {
+            if (IsLoaded) SaveSettings();
+        }
+
+        private void WinnerMessagesList_DoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (WinnerMessagesList.SelectedItem is WinnerChatMessage msg)
+            {
+                try { System.Windows.Clipboard.SetText(msg.ToString()); }
+                catch { /* clipboard unavailable */ }
+            }
+        }
+
+        private void UpdateEntryCommandFieldState()
+        {
+            if (EntryModeCombo == null || EntryCommandText == null)
+                return;
+
+            bool commandMode = EntryModeCombo.SelectedIndex == (int)EntryMode.Command;
+            bool gw2Mode = EntryModeCombo.SelectedIndex == (int)EntryMode.Gw2Account;
+            EntryCommandText.IsEnabled = commandMode;
+            EntryCommandText.Opacity = commandMode ? 1.0 : 0.6;
+            if (gw2Mode)
+                EntryCommandText.ToolTip = "GW2 mode: viewers type their GW2 account name (e.g. PlayerName.1234) in chat to enter.";
+            else
+                EntryCommandText.ToolTip = "Command text (e.g. !enter)";
+        }
+
         private void StartEntries_Click(object sender, RoutedEventArgs e)
         {
             if (_entriesOpen)
@@ -1683,14 +2124,47 @@ namespace Gw2Giveaway
                 _entryTimeSeconds = 0;
 
             _entriesOpen = true;
-            Entrants.Clear(); // fresh list for new period
-            
+            // Keep giveaway history across rolls; only reset current entrant list for the new period
+            Entrants.Clear();
+            _gw2AccountMap.Clear();
+            _followerCache.Clear();
+            SetCurrentWinner(null);
 
-            string timeMsg = _entryTimeSeconds > 0 ? $" for {TimeSpan.FromSeconds(_entryTimeSeconds):mm\\:ss} minutes" : " (unlimited)";
-            _twitch?.SendMessageAsync($"Giveaway entries OPEN{timeMsg}! Type {_settings.EntryCommand} to join!");
+            if (_settings.EntryType == EntryMode.ActiveUsers)
+            {
+                _ = ImportCurrentChattersAsync(announceErrors: true);
+                StartActiveUsersPolling();
+            }
+
+            string followersNote = _settings.FollowersOnly ? " (Followers only)" : string.Empty;
+            string subNote = _settings.SubscriberBonusEntries > 1 ? $" Subs get {_settings.SubscriberBonusEntries}x entries!" : string.Empty;
+            string openMessage = _settings.EntryType == EntryMode.ActiveUsers
+                ? $"Giveaway entries OPEN! Active Users mode collecting chatters.{followersNote}{subNote}"
+                : _settings.EntryType == EntryMode.Gw2Account
+                    ? $"Giveaway entries OPEN! Type your GW2 account name (e.g. PlayerName.1234) to enter!{followersNote}{subNote}"
+                    : $"Giveaway entries OPEN{(_entryTimeSeconds > 0 ? $" for {TimeSpan.FromSeconds(_entryTimeSeconds):mm\\:ss}" : " (unlimited)")}! Type {_settings.EntryCommand} to join!{followersNote}{subNote}";
+            _twitch?.SendMessageAsync(openMessage);
 
             EntryStatusText.Text = _entryTimeSeconds > 0 ? $"Entries Open – {_entryTimeSeconds}s remaining" : "Entries Open (unlimited)";
             EntryStatusText.Foreground = Brushes.LimeGreen;
+
+            // Start overlay countdown if overlay is open
+            EnsureOverlayReady(showOverlay: false);
+
+            // Set the instruction line to match the current entry mode
+            if (_overlay != null)
+            {
+                string instruction = _settings.EntryType switch
+                {
+                    EntryMode.ActiveUsers      => "Active chatters are entered automatically!",
+                    EntryMode.Gw2Account       => "Type your GW2 account name (e.g. Name.1234) to enter",
+                    EntryMode.ChannelPointManual => "Redeem channel points to enter!",
+                    _                          => $"Type {_settings.EntryCommand} in chat to join"
+                };
+                _overlay.SetEntryInstruction(instruction);
+            }
+
+            _overlay?.StartCountdown(_entryTimeSeconds, Entrants.Count);
 
             if (_entryTimeSeconds > 0)
             {
@@ -1699,7 +2173,6 @@ namespace Gw2Giveaway
                 _entryTimer.Tick += EntryTimer_Tick;
                 _entryTimer.Start();
             }
-
         }
 
         private void StopEntries_Click(object sender, RoutedEventArgs e)
@@ -1712,6 +2185,8 @@ namespace Gw2Giveaway
 
             _entriesOpen = false;
             _entryTimer?.Stop();
+            StopActiveUsersPolling();
+            _overlay?.StopCountdown();
 
             _twitch?.SendMessageAsync($"Giveaway entries CLOSED! Total entrants: {Entrants.Count}");
 
@@ -1733,28 +2208,192 @@ namespace Gw2Giveaway
             EntryStatusText.Text = $"Entries Open – {_entryTimeSeconds}s remaining";
         }
 
-        // Updated Twitch_OnMessageReceived – wrap collection changes in Dispatcher.Invoke
-        private void Twitch_OnMessageReceived(string username, string message)
+        // Updated Twitch_OnMessageReceived – handles all entry modes, follower check, sub bonus, winner messages
+        private void Twitch_OnMessageReceived(string username, string message, bool isSubscriber)
         {
-            if (!_entriesOpen) return; // only during open entry period
-
             username = username.ToLowerInvariant();
 
-            Dispatcher.Invoke(() =>
+            // Always track messages from the current winner for the Winners tab
+            if (!string.IsNullOrEmpty(_currentWinner) &&
+                string.Equals(username, _currentWinner, StringComparison.OrdinalIgnoreCase))
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    WinnerMessages.Add(new WinnerChatMessage { Sender = username, Text = message });
+                    // Auto-scroll
+                    if (WinnerMessagesList.Items.Count > 0)
+                        WinnerMessagesList.ScrollIntoView(WinnerMessagesList.Items[^1]);
+                });
+            }
+
+            if (!_entriesOpen) return;
+
+            // Fire-and-forget async entry processing to keep the event handler non-blocking
+            _ = ProcessEntryAsync(username, message, isSubscriber);
+        }
+
+        private async Task ProcessEntryAsync(string username, string message, bool isSubscriber)
+        {
+            // Follower-only check (with cache)
+            if (_settings.FollowersOnly)
+            {
+                bool isFollower = await IsFollowerCachedAsync(username);
+                if (!isFollower) return;
+            }
+
+            int entryCount = 1;
+            if (_settings.SubscriberBonusEntries > 1 && isSubscriber)
+                entryCount = _settings.SubscriberBonusEntries;
+
+            await Dispatcher.InvokeAsync(() =>
             {
                 if (_settings.EntryType == EntryMode.Command)
                 {
                     if (message.Equals(_settings.EntryCommand, StringComparison.OrdinalIgnoreCase))
+                        AddEntrantWithBonus(username, entryCount);
+                }
+                else if (_settings.EntryType == EntryMode.ActiveUsers)
+                {
+                    AddEntrantWithBonus(username, entryCount);
+                }
+                else if (_settings.EntryType == EntryMode.Gw2Account)
+                {
+                    // Expect message to contain the GW2 account name, e.g. "PlayerName.1234"
+                    // Simple validation: must contain a dot followed by 4 digits
+                    string trimmed = message.Trim();
+                    if (IsValidGw2AccountName(trimmed))
                     {
-                        if (!Entrants.Contains(username))
-                            Entrants.Add(username);
+                        _gw2AccountMap[username] = trimmed;
+                        AddEntrantWithBonus(username, entryCount);
+                        // Refresh display so GW2 name shows up alongside Twitch name
+                        int idx = Entrants.IndexOf(username);
+                        if (idx >= 0)
+                        {
+                            // Force ListBox refresh by removing and re-inserting at same index
+                            Entrants.RemoveAt(idx);
+                            Entrants.Insert(idx, username);
+                        }
                     }
                 }
-                else if (_settings.EntryType == EntryMode.AllChatters)
+            });
+        }
+
+        private static bool IsValidGw2AccountName(string name)
+        {
+            // GW2 account names look like "DisplayName.NNNN" (4 digits at the end)
+            if (string.IsNullOrWhiteSpace(name)) return false;
+            int dot = name.LastIndexOf('.');
+            if (dot < 1 || dot >= name.Length - 1) return false;
+            string suffix = name[(dot + 1)..];
+            return suffix.Length == 4 && suffix.All(char.IsDigit);
+        }
+
+        private void AddEntrantWithBonus(string username, int entryCount)
+        {
+            if (entryCount <= 1)
+            {
+                if (!Entrants.Contains(username))
                 {
-                    if (!Entrants.Contains(username))
-                        Entrants.Add(username);
+                    Entrants.Add(username);
+                    _overlay?.UpdateEntrantCount(Entrants.Distinct().Count());
                 }
+                return;
+            }
+
+            // Subscriber bonus: add username multiple times (displayed as "username", "username [2]", etc.)
+            if (!Entrants.Contains(username))
+                Entrants.Add(username);
+
+            for (int i = 2; i <= entryCount; i++)
+            {
+                // Add duplicate entries so random pick naturally weights them
+                Entrants.Add(username);
+            }
+
+            _overlay?.UpdateEntrantCount(Entrants.Distinct().Count());
+        }
+
+        /// <summary>Check follower status with a 5-minute in-memory cache.</summary>
+        private async Task<bool> IsFollowerCachedAsync(string username)
+        {
+            if (_followerCache.TryGetValue(username, out var cached) && DateTime.UtcNow < cached.Expiry)
+                return cached.IsFollower;
+
+            bool isFollower = await CheckIsFollowerAsync(username);
+            _followerCache[username] = (isFollower, DateTime.UtcNow + FollowerCacheTtl);
+            return isFollower;
+        }
+
+        private async Task<bool> CheckIsFollowerAsync(string username)
+        {
+            try
+            {
+                string broadcasterId = BroadcasterIdText.Text.Trim();
+                string moderatorId = _oauthUserId?.Trim() ?? string.Empty;
+                string clientId = _settings.TwitchClientId;
+                string token = _oauthAccessToken;
+
+                if (string.IsNullOrWhiteSpace(broadcasterId) || string.IsNullOrWhiteSpace(moderatorId) ||
+                    string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(token))
+                    return true; // Fail open if not configured
+
+                string normalizedToken = token.StartsWith("oauth:", StringComparison.OrdinalIgnoreCase)
+                    ? token["oauth:".Length..]
+                    : token;
+
+                // Look up user ID by login first
+                string userId = await GetUserIdByLoginAsync(username, normalizedToken, clientId);
+                if (string.IsNullOrEmpty(userId)) return false;
+
+                string url = $"https://api.twitch.tv/helix/channels/followers?broadcaster_id={Uri.EscapeDataString(broadcasterId)}&user_id={Uri.EscapeDataString(userId)}";
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", normalizedToken);
+                request.Headers.Add("Client-Id", clientId);
+
+                using var response = await _httpClient.SendAsync(request);
+                if (!response.IsSuccessStatusCode) return true; // Fail open on API error
+
+                string body = await response.Content.ReadAsStringAsync();
+                using var doc = System.Text.Json.JsonDocument.Parse(body);
+                if (doc.RootElement.TryGetProperty("total", out var totalEl) && totalEl.GetInt32() > 0)
+                    return true;
+                return false;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.LogError("CheckIsFollowerAsync", ex);
+                return true; // Fail open
+            }
+        }
+
+        private async Task<string> GetUserIdByLoginAsync(string login, string token, string clientId)
+        {
+            try
+            {
+                string url = $"https://api.twitch.tv/helix/users?login={Uri.EscapeDataString(login)}";
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+                request.Headers.Add("Client-Id", clientId);
+                using var response = await _httpClient.SendAsync(request);
+                if (!response.IsSuccessStatusCode) return string.Empty;
+                string body = await response.Content.ReadAsStringAsync();
+                using var doc = System.Text.Json.JsonDocument.Parse(body);
+                if (doc.RootElement.TryGetProperty("data", out var data) && data.GetArrayLength() > 0)
+                    return data[0].TryGetProperty("id", out var id) ? (id.GetString() ?? string.Empty) : string.Empty;
+                return string.Empty;
+            }
+            catch { return string.Empty; }
+        }
+
+        /// <summary>Sets the current winner so their chat messages populate the Winners tab.</summary>
+        private void SetCurrentWinner(string? winnerName)
+        {
+            _currentWinner = winnerName?.ToLowerInvariant();
+            Dispatcher.Invoke(() =>
+            {
+                WinnerMessages.Clear();
+                if (!string.IsNullOrEmpty(_currentWinner))
+                    WinnerMessages.Add(new WinnerChatMessage { Sender = "System", Text = $"Now tracking messages from @{_currentWinner}" });
             });
         }
 
@@ -1764,6 +2403,10 @@ namespace Gw2Giveaway
             var mode = (GiveawayMode)GiveawayModeCombo.SelectedIndex;
             RandomPoolPanel.Visibility = (mode == GiveawayMode.RandomPool) ? Visibility.Visible : Visibility.Collapsed;
             SaveSettings();
+
+            // Refresh overlay preview to match the newly selected mode
+            if (_overlay != null)
+                UpdateOverlayClassicPrizePreview();
         }
 
         private void BankPercentageSlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -1882,36 +2525,37 @@ namespace Gw2Giveaway
             return entries;
         }
 
-        private async Task RefreshDataManagementViewAsync(string? query = null)
+        private async Task RefreshDataManagementViewAsync(string? triviaQuery = null, string? historyQuery = null)
         {
             if (DataViewersList == null || DataStatusText == null)
                 return;
 
             try
             {
-                var rows = await _databaseService.SearchViewersAsync(query, 500);
+                var rows = await _databaseService.SearchViewersAsync(triviaQuery, 500);
                 DataViewersList.ItemsSource = rows.Select(r => new TriviaViewerRow
                 {
                     Username = r.Username,
                     Iq = r.Iq
                 }).ToList();
 
+                var historyRows = await _databaseService.GetWinnersAsync(historyQuery, 500);
+
                 if (DataHistoryList != null)
                 {
-                    DataHistoryList.ItemsSource = _giveawayHistory
-                        .OrderByDescending(h => h.TimestampUtc)
+                    DataHistoryList.ItemsSource = historyRows
                         .Take(300)
                         .Select(h => new
                         {
-                            Date = h.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"),
+                            Date   = h.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"),
                             Winner = h.Winner,
-                            Prize = h.Amount > 1 ? $"{h.Amount} × {h.Prize}" : h.Prize,
+                            Prize  = h.Amount > 1 ? $"{h.Amount} × {h.Prize}" : h.Prize,
                             Source = h.Source
                         })
                         .ToList();
                 }
 
-                DataStatusText.Text = $"Loaded {rows.Count} trivia records • {_giveawayHistory.Count} giveaway history entries";
+                DataStatusText.Text = $"Trivia: {rows.Count} records • Winners: {historyRows.Count} shown";
             }
             catch (Exception ex)
             {
@@ -1920,21 +2564,37 @@ namespace Gw2Giveaway
             }
         }
 
-        private async void DataSearch_Click(object sender, RoutedEventArgs e)
+        private async void DataTriviaSearch_Click(object sender, RoutedEventArgs e)
         {
-            string query = DataViewerSearchText?.Text?.Trim() ?? string.Empty;
-            await RefreshDataManagementViewAsync(query);
+            string triviaQuery = DataTriviaSearchText?.Text?.Trim() ?? string.Empty;
+            string historyQuery = DataHistorySearchText?.Text?.Trim() ?? string.Empty;
+            await RefreshDataManagementViewAsync(triviaQuery, historyQuery);
         }
 
-        private async void DataRefresh_Click(object sender, RoutedEventArgs e)
+        private async void DataTriviaRefresh_Click(object sender, RoutedEventArgs e)
         {
-            if (DataViewerSearchText != null)
-                DataViewerSearchText.Text = string.Empty;
+            if (DataTriviaSearchText != null)
+                DataTriviaSearchText.Text = string.Empty;
 
-            await RefreshDataManagementViewAsync();
+            await RefreshDataManagementViewAsync(null, DataHistorySearchText?.Text?.Trim());
         }
 
-        private async void DataClearAll_Click(object sender, RoutedEventArgs e)
+        private async void DataHistorySearch_Click(object sender, RoutedEventArgs e)
+        {
+            string triviaQuery = DataTriviaSearchText?.Text?.Trim() ?? string.Empty;
+            string historyQuery = DataHistorySearchText?.Text?.Trim() ?? string.Empty;
+            await RefreshDataManagementViewAsync(triviaQuery, historyQuery);
+        }
+
+        private async void DataHistoryRefresh_Click(object sender, RoutedEventArgs e)
+        {
+            if (DataHistorySearchText != null)
+                DataHistorySearchText.Text = string.Empty;
+
+            await RefreshDataManagementViewAsync(DataTriviaSearchText?.Text?.Trim(), null);
+        }
+
+        private async void DataClearTrivia_Click(object sender, RoutedEventArgs e)
         {
             var result = DialogService.ShowConfirm(
                 "Clear all saved Trivia IQ records? This cannot be undone.",
@@ -1949,15 +2609,38 @@ namespace Gw2Giveaway
             try
             {
                 await _databaseService.ClearAllViewersAsync();
-                _giveawayHistory.Clear();
-                SaveSettings();
-                await RefreshDataManagementViewAsync();
-                DialogService.ShowInfo("All Trivia IQ and giveaway history data has been cleared.");
+                await RefreshDataManagementViewAsync(DataTriviaSearchText?.Text?.Trim(), DataHistorySearchText?.Text?.Trim());
+                DialogService.ShowInfo("All Trivia IQ data has been cleared.");
             }
             catch (Exception ex)
             {
-                AppLogger.LogError("MainWindow.DataClearAll_Click", ex);
+                AppLogger.LogError("MainWindow.DataClearTrivia_Click", ex);
                 DialogService.ShowInfo("Failed to clear trivia data: " + ex.Message);
+            }
+        }
+
+        private async void DataClearHistory_Click(object sender, RoutedEventArgs e)
+        {
+            var result = DialogService.ShowConfirm(
+                "Clear all giveaway winner history? This cannot be undone.",
+                "Clear Winner History",
+                yesText: "Clear",
+                noText: "Cancel",
+                cancelText: "Cancel");
+
+            if (result != MessageBoxResult.Yes)
+                return;
+
+            try
+            {
+                await _databaseService.ClearAllWinnersAsync();
+                await RefreshDataManagementViewAsync(DataTriviaSearchText?.Text?.Trim(), DataHistorySearchText?.Text?.Trim());
+                DialogService.ShowInfo("Giveaway winner history has been cleared.");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.LogError("MainWindow.DataClearHistory_Click", ex);
+                DialogService.ShowInfo("Failed to clear winner history: " + ex.Message);
             }
         }
 
@@ -2087,20 +2770,19 @@ namespace Gw2Giveaway
         {
             try
             {
-                _giveawayHistory.Insert(0, new GiveawayHistoryEntry
+                var entry = new GiveawayHistoryEntry
                 {
                     TimestampUtc = DateTime.UtcNow,
                     Winner = winner?.Trim() ?? string.Empty,
-                    Prize = prize?.Trim() ?? string.Empty,
+                    Prize  = prize?.Trim()  ?? string.Empty,
                     Amount = amount <= 0 ? 1 : amount,
                     Source = source?.Trim() ?? string.Empty
-                });
+                };
 
-                while (_giveawayHistory.Count > 1000)
-                    _giveawayHistory.RemoveAt(_giveawayHistory.Count - 1);
+                // Persist to DB (fire-and-forget; in-memory list is refreshed after)
+                _ = _databaseService.AddWinnerAsync(entry);
 
-                SaveSettings();
-                _ = RefreshDataManagementViewAsync(DataViewerSearchText?.Text);
+                _ = RefreshDataManagementViewAsync(DataTriviaSearchText?.Text?.Trim(), DataHistorySearchText?.Text?.Trim());
             }
             catch (Exception ex)
             {

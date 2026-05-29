@@ -61,13 +61,68 @@
             <!-- Prize Mode -->
             <Grid x:Name="PrizeGrid" Visibility="Visible">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <TextBlock Text="Giveaway Active!" FontSize="40" Foreground="Gold" Margin="0,0,0,40"/>
-                    <TextBlock x:Name="PrizeTitleText" FontSize="36" Foreground="White" TextWrapping="Wrap" Margin="0,0,0,50"/>
-                    <Image x:Name="PrizeImage" Width="200" Height="200" Stretch="Uniform" Margin="0,0,0,50"/>
-                    <TextBlock x:Name="EntryInstructionText"
-                               Text="Type !enter in chat to join"
-                               FontSize="32"
-                               Foreground="White"/>
+                    <TextBlock Text="Giveaway Active!" FontSize="40" Foreground="Gold" Margin="0,0,0,10"/>
+
+                    <!-- Mode badge: changes with BankOnly / PrizeOnly / RandomPool -->
+                    <Border x:Name="ModeBadge" HorizontalAlignment="Center" Margin="0,0,0,12"
+                            CornerRadius="20" Padding="16,5" Background="#66000000"
+                            BorderThickness="1">
+                        <Border.BorderBrush>
+                            <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
+                                <GradientStop Color="#00FFD700" Offset="0"/>
+                                <GradientStop Color="#AAFFD700" Offset="0.5"/>
+                                <GradientStop Color="#00FFD700" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Border.BorderBrush>
+                        <TextBlock x:Name="ModeBadgeText" Text="🎲 Random Pool"
+                                   FontSize="18" Foreground="#FFD700" HorizontalAlignment="Center"/>
+                    </Border>
+
+                    <TextBlock x:Name="PrizeTitleText" FontSize="36" Foreground="White" TextWrapping="Wrap" Margin="0,0,0,20"/>
+                    <Image x:Name="PrizeImage" Width="200" Height="200" Stretch="Uniform" Margin="0,0,0,20"/>
+
+                    <!-- Countdown panel (shown when entries are open) -->
+                    <StackPanel x:Name="CountdownPanel" HorizontalAlignment="Center" Visibility="Collapsed">
+                        <!-- Timer row: icon + big number side by side -->
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,4">
+                            <TextBlock Text="⏳" FontSize="34" VerticalAlignment="Center" Margin="0,0,8,0"
+                                       Effect="{x:Null}"/>
+                            <TextBlock x:Name="CountdownText" Text="" FontSize="56" FontWeight="ExtraBold"
+                                       Foreground="White" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <!-- Thin ornamental separator -->
+                        <Rectangle Height="2" Fill="#88FFD700" Margin="30,0,30,6" RadiusX="1" RadiusY="1"/>
+                        <!-- Label below timer -->
+                        <TextBlock x:Name="CountdownLabel" Text="until entries close"
+                                   FontSize="17" Foreground="#CCFFDD00" HorizontalAlignment="Center"
+                                   FontStyle="Italic" Margin="0,0,0,4"/>
+                        <!-- Entrant count pill -->
+                        <Border Background="#55000000" CornerRadius="30" Padding="18,5"
+                                HorizontalAlignment="Center" Margin="0,2,0,12">
+                            <TextBlock x:Name="EntrantCountText" Text="0 entrants"
+                                       FontSize="20" Foreground="#00FFAA" HorizontalAlignment="Center"/>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- Entry instruction – styled like a parchment ribbon -->
+                    <Border Background="#88000000" CornerRadius="14" Padding="18,8"
+                            HorizontalAlignment="Center" Margin="0,4,0,0">
+                        <Border.BorderBrush>
+                            <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
+                                <GradientStop Color="#00FFD700" Offset="0"/>
+                                <GradientStop Color="#BBFFD700" Offset="0.5"/>
+                                <GradientStop Color="#00FFD700" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Border.BorderBrush>
+                        <Border.BorderThickness>0,0,0,2</Border.BorderThickness>
+                        <TextBlock x:Name="EntryInstructionText"
+                                   Text="Type !enter in chat to join"
+                                   FontSize="28"
+                                   Foreground="White"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"
+                                   MaxWidth="500"/>
+                    </Border>
                 </StackPanel>
             </Grid>
 
@@ -163,42 +218,55 @@
 
             <!-- Winner Mode -->
             <Grid x:Name="WinnerGrid" Visibility="Collapsed">
-                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <TextBlock Text="WINNER!" FontSize="60" Foreground="Gold" Margin="0,0,0,50"/>
-                    <TextBlock x:Name="WinnerNameText" FontSize="50" Foreground="White" Margin="0,0,0,60"/>
+                <Viewbox Stretch="Uniform" StretchDirection="DownOnly" Margin="20,80,20,20">
+                    <StackPanel Width="520" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Text="WINNER!" FontSize="56" Foreground="Gold" Margin="0,0,0,24"/>
+                        <TextBlock x:Name="WinnerNameText"
+                                   FontSize="44"
+                                   Foreground="White"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"
+                                   MaxWidth="500"
+                                   Margin="0,0,0,24"/>
 
-                    <!-- Prize Pool Selection Display (2 boxes - Bank vs Displayed Prize) - only shown in RandomPool mode -->
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,50" x:Name="PrizePoolPanel" Visibility="Collapsed">
-                        <!-- Bank Option -->
-                        <Border x:Name="BankPoolBox" Background="#AA1a1a2e" CornerRadius="20" 
-                                Padding="20" Margin="0,0,30,0" BorderBrush="#333366" BorderThickness="3"
-                                Width="160" Height="160">
-                            <Border.Effect>
-                                <DropShadowEffect x:Name="BankPoolGlow" Color="Blue" ShadowDepth="0" BlurRadius="5" Opacity="0"/>
-                            </Border.Effect>
-                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                <TextBlock Text="🏦" FontSize="50" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                                <TextBlock Text="BANK" FontSize="18" Foreground="#6699FF" HorizontalAlignment="Center" FontWeight="Bold"/>
-                            </StackPanel>
-                        </Border>
+                        <!-- Prize Pool Selection Display (2 boxes - Bank vs Displayed Prize) - only shown in RandomPool mode -->
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,24" x:Name="PrizePoolPanel" Visibility="Collapsed">
+                            <!-- Bank Option -->
+                            <Border x:Name="BankPoolBox" Background="#AA1a1a2e" CornerRadius="20" 
+                                    Padding="20" Margin="0,0,20,0" BorderBrush="#333366" BorderThickness="3"
+                                    Width="150" Height="150">
+                                <Border.Effect>
+                                    <DropShadowEffect x:Name="BankPoolGlow" Color="Blue" ShadowDepth="0" BlurRadius="5" Opacity="0"/>
+                                </Border.Effect>
+                                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                    <TextBlock Text="🏦" FontSize="46" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                                    <TextBlock Text="BANK" FontSize="18" Foreground="#6699FF" HorizontalAlignment="Center" FontWeight="Bold"/>
+                                </StackPanel>
+                            </Border>
 
-                        <!-- Displayed Prize Option -->
-                        <Border x:Name="DisplayedPoolBox" Background="#AA1a1a2e" CornerRadius="20"
-                                Padding="20" Margin="30,0,0,0" BorderBrush="#666633" BorderThickness="3"
-                                Width="160" Height="160">
-                            <Border.Effect>
-                                <DropShadowEffect x:Name="DisplayedPoolGlow" Color="Gold" ShadowDepth="0" BlurRadius="5" Opacity="0"/>
-                            </Border.Effect>
-                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                <TextBlock Text="⭐" FontSize="50" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                                <TextBlock Text="PRIZE" FontSize="18" Foreground="#FFDD00" HorizontalAlignment="Center" FontWeight="Bold"/>
-                            </StackPanel>
-                        </Border>
+                            <!-- Displayed Prize Option -->
+                            <Border x:Name="DisplayedPoolBox" Background="#AA1a1a2e" CornerRadius="20"
+                                    Padding="20" Margin="20,0,0,0" BorderBrush="#666633" BorderThickness="3"
+                                    Width="150" Height="150">
+                                <Border.Effect>
+                                    <DropShadowEffect x:Name="DisplayedPoolGlow" Color="Gold" ShadowDepth="0" BlurRadius="5" Opacity="0"/>
+                                </Border.Effect>
+                                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                    <TextBlock Text="⭐" FontSize="46" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                                    <TextBlock Text="PRIZE" FontSize="18" Foreground="#FFDD00" HorizontalAlignment="Center" FontWeight="Bold"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <Image x:Name="WinnerPrizeImage" Width="180" Height="180" Stretch="Uniform" Margin="0,0,0,22"/>
+                        <TextBlock x:Name="WinnerPrizeText"
+                                   FontSize="34"
+                                   Foreground="White"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"
+                                   MaxWidth="500"/>
                     </StackPanel>
-
-                    <Image x:Name="WinnerPrizeImage" Width="200" Height="200" Stretch="Uniform" Margin="0,0,0,60"/>
-                    <TextBlock x:Name="WinnerPrizeText" FontSize="40" Foreground="White"/>
-                </StackPanel>
+                </Viewbox>
             </Grid>
         </Grid>
     </Border>

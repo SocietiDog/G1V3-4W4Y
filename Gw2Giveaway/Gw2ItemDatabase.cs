@@ -33,10 +33,9 @@ namespace Gw2Giveaway
             public string? description { get; set; }
         }
 
-        // Save next to the exe in a "Data" subfolder (creates if missing)
-        private static readonly string AppDir = AppDomain.CurrentDomain.BaseDirectory;
-        private static readonly string DataFolder = Path.Combine(AppDir, "Data");
-        private static readonly string CacheFile = Path.Combine(DataFolder, "items.json");
+        // Save in per-user LocalAppData storage
+        private static readonly string DataFolder = AppDataPaths.DataFolder;
+        private static readonly string CacheFile = AppDataPaths.ItemsCacheFile;
 
         public static async Task LoadAsync(HttpClient client, IProgress<int>? progress = null)
         {

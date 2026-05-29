@@ -22,7 +22,7 @@ namespace Gw2Giveaway
         public event Action? OnConnected;
         public event Action<string>? OnConnectionError;
         public event Action? OnJoinedChannel;
-        public event Action<string, string>? OnMessageReceived;
+        public event Action<string, string, bool>? OnMessageReceived;
 
         private readonly HashSet<string> _seenUsers = new();
 
@@ -87,21 +87,15 @@ namespace Gw2Giveaway
         {
             string username = e.ChatMessage.Username.ToLowerInvariant();
             string message = e.ChatMessage.Message.Trim();
-            OnMessageReceived?.Invoke(username, message);
+            bool isSubscriber = e.ChatMessage.SubscribedMonthCount > 0
+                || e.ChatMessage.IsBroadcaster
+                || e.ChatMessage.UserType == TwitchLib.Client.Enums.UserType.Broadcaster;
+            OnMessageReceived?.Invoke(username, message, isSubscriber);
             await Task.CompletedTask;
         }
 
         public async Task DisconnectAsync()
         {
-            try
-            {
-                await SendMessageAsync("G1V3 - 4W4Y bot going offline. Thanks for playing! 👋");
-            }
-            catch (Exception ex)
-            {
-                AppLogger.LogError("TwitchChat.DisconnectAsync.SendMessage", ex);
-            }
-
             if (_client != null)
             {
                 await _client.DisconnectAsync();
