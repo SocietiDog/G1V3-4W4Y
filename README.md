@@ -16,7 +16,7 @@ G1V3 - 4W4Y is a free, open-source WPF desktop application that brings giveaways
 - **Local Data Storage** — All data stays on your PC; no cloud dependency
 
 ## 📥 Download
-**[Download G1V3 - 4W4Y Installer](https://github.com/SocietiDog/Gw2Giver-Tron/releases/latest/download/G1V3-4W4Y-Installer-latest.msi)**
+**[Download G1V3 - 4W4Y Installer](https://github.com/SocietiDog/G1V3-4W4Y/releases/latest/download/G1V3-4W4Y-Installer-latest.msi)**
 
 > **Requirements:** Windows 10+, .NET 10.0 (auto-installed if needed)
 
