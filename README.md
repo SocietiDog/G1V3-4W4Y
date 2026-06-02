@@ -58,7 +58,7 @@ This project is open-source under **GPLv3**. Feel free to:
 
 ### Build from Source
 ```
-git clone https://github.com/SocietiDog/Gw2Giver-Tron.git
+git clone https://github.com/SocietiDog/G1V3-4W4Y.git
 cd Gw2Giveaway
 dotnet build -c Release
 ```
@@ -70,8 +70,8 @@ This project is licensed under the **GNU General Public License v3.0** — see [
 
 ## 🔗 Links
 - **Website:** [g1v34w4y.wordpress.com](https://g1v34w4y.wordpress.com/)
-- **GitHub:** [github.com/SocietiDog/Gw2Giver-Tron](https://github.com/SocietiDog/Gw2Giver-Tron)
-- **Report Issues:** [GitHub Issues](https://github.com/SocietiDog/Gw2Giver-Tron/issues)
+- **GitHub:** [github.com/SocietiDog/G1V3-4W4Y](https://github.com/SocietiDog/G1V3-4W4Y)
+- **Report Issues:** [GitHub Issues](https://github.com/SocietiDog/G1V3-4W4Y/issues)
 
 ## 💝 Support
 If you enjoy using G1V3 - 4W4Y, consider supporting the project on your streaming platform or via donations through your website.
