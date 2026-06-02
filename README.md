@@ -58,7 +58,7 @@ This project is open-source under **GPLv3**. Feel free to:
 
 ### Build from Source
 ```
-git clone https://github.com/SocietiDog/Gw2Giver-Tron.git
+git clone https://github.com/SocietiDog/G1V3-4W4Y.git
 cd Gw2Giveaway
 dotnet build -c Release
 ```
