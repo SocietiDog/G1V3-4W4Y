@@ -79,3 +79,13 @@ If you enjoy using G1V3 - 4W4Y, consider supporting the project on your streamin
 ---
 
 **Made with ❤️ for the GW2 streaming community**
+
+
+<img width="800" height="980" alt="Gw2Giveaway_sX8Qtr13R8-ezgif com-video-to-gif-converter" src="https://github.com/user-attachments/assets/b7291004-2083-47f1-a1c1-50808a87421a" />
+<img width="600" height="750" alt="Gw2Giveaway_rNFarem1gl-ezgif com-video-to-gif-converter" src="https://github.com/user-attachments/assets/092004d3-7d64-4720-8e18-c7d236d97bbe" />
+<img width="600" height="750" alt="Gw2Giveaway_8XyfaUV9OB-ezgif com-video-to-gif-converter(1)" src="https://github.com/user-attachments/assets/1437f6d1-61d0-4900-aff6-ed1b9f9924b4" />
+<img width="800" height="380" alt="ezgif com-video-to-gif-converter" src="https://github.com/user-attachments/assets/e661af52-dc45-497b-8668-50f3b8a9aaa8" />
+
+
+
+
